@@ -17,4 +17,4 @@ dependencies = [
 
 [project.scripts]
 incidentroom-inference = "inference:main"
-server = "webapp:app"
+server = "server.app:main"
