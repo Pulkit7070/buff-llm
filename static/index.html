@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IncidentRoom v2</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ═══ Design tokens — sourced from Ping/CyberpunkTheme.swift ═══ */
+:root{
+  --void:#080510;--panel:rgba(13,13,20,0.88);--panel-s:#0D0D14;
+  --cyan:#00FFF2;--mag:#FF00CC;--pur:#9933FF;
+  --grn:#4DDC76;--ylw:#FFE600;--org:#FF8000;--red:#FF6B6B;
+  --accent:#00D1E0;--mint:#4DF2D9;
+  --t1:rgba(255,255,255,0.85);--t2:rgba(255,255,255,0.60);
+  --t3:rgba(255,255,255,0.50);--t4:rgba(255,255,255,0.40);
+  --t5:rgba(255,255,255,0.25);--t6:rgba(255,255,255,0.08);
+  --b1:rgba(255,255,255,0.08);--b2:rgba(255,255,255,0.12);--b3:rgba(255,255,255,0.04);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--void);color:var(--t1);font-size:13px;line-height:1.5;height:100vh;overflow:hidden}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:2px}
+
+/* ═══ Background — Ping fluid mesh ═══ */
+.bg{position:fixed;inset:0;overflow:hidden;z-index:0;pointer-events:none}
+.orb{position:absolute;border-radius:50%}
+.o1{width:400px;height:400px;background:rgba(0,255,242,.12);filter:blur(120px);top:-120px;left:-80px;animation:f1 8s ease-in-out infinite alternate}
+.o2{width:300px;height:300px;background:rgba(255,0,204,.08);filter:blur(100px);bottom:-100px;right:-60px;animation:f2 8s ease-in-out infinite alternate}
+.o3{width:500px;height:500px;background:rgba(153,51,255,.10);filter:blur(150px);top:30%;left:35%;animation:f3 8s ease-in-out infinite alternate}
+@keyframes f1{to{transform:translate(150px,100px)}}
+@keyframes f2{to{transform:translate(-150px,-100px)}}
+@keyframes f3{to{transform:translate(50px,-50px)}}
+.scan{position:fixed;inset:0;z-index:1;pointer-events:none;background:repeating-linear-gradient(0deg,transparent 0px,transparent 2px,rgba(0,0,0,.025) 2px,rgba(0,0,0,.025) 3px)}
+
+/* ═══ Header ═══ */
+.hdr{display:flex;align-items:center;justify-content:space-between;padding:12px 24px;background:var(--panel);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:1px solid var(--b1);position:relative;z-index:10}
+.hdr::after{content:'';position:absolute;bottom:-1px;left:0;right:0;height:1.5px;background:linear-gradient(90deg,transparent,rgba(0,255,242,.5),rgba(153,51,255,.25),transparent);opacity:.7}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-dot{width:8px;height:8px;border-radius:50%;background:var(--red);box-shadow:0 0 8px var(--red);animation:blink 2s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.4}}
+.logo h1{font:700 14px 'JetBrains Mono',monospace;letter-spacing:2px;text-transform:uppercase;color:var(--t1)}
+.logo h1 span{color:var(--cyan);font-weight:500}
+.ctrls{display:flex;gap:8px;align-items:center}
+.sel{background:rgba(255,255,255,.04);border:1px solid var(--b1);color:var(--t1);padding:7px 14px;border-radius:999px;font:500 11px 'JetBrains Mono',monospace;outline:none;cursor:pointer;transition:border-color .2s}
+.sel:focus{border-color:rgba(0,255,242,.3)}
+.seed-input{background:rgba(255,255,255,.04);border:1px solid var(--b1);color:var(--t1);padding:7px 12px;border-radius:10px;font:500 11px 'JetBrains Mono',monospace;width:56px;outline:none;transition:border-color .2s}
+.seed-input:focus{border-color:rgba(0,255,242,.3)}
+.btn{padding:8px 20px;border-radius:999px;border:none;font:600 11px 'JetBrains Mono',monospace;cursor:pointer;transition:all .2s;text-transform:uppercase;letter-spacing:1px}
+.btn-run{background:var(--accent);color:#000;box-shadow:0 2px 12px rgba(0,209,224,.25)}
+.btn-run:hover{box-shadow:0 4px 20px rgba(0,209,224,.4);transform:translateY(-1px)}.btn-run:disabled{opacity:.3;cursor:default;box-shadow:none;transform:none}
+.btn-arena{background:rgba(153,51,255,.15);color:var(--pur);border:1px solid rgba(153,51,255,.25)}
+.btn-arena:hover{background:rgba(153,51,255,.25);box-shadow:0 0 12px rgba(153,51,255,.15)}
+.btn-manual{background:rgba(255,255,255,.04);color:var(--t2);border:1px solid var(--b1)}
+.btn-manual:hover{border-color:rgba(0,255,242,.2);color:var(--t1)}
+.btn-stop{background:rgba(255,107,107,.15);color:var(--red);border:1px solid rgba(255,107,107,.25);display:none}
+.mute{background:none;border:1px solid var(--b1);border-radius:999px;color:var(--t4);cursor:pointer;font-size:14px;padding:5px 8px;transition:all .2s}
+.mute:hover{border-color:var(--b2);color:var(--t2)}
+
+/* ═══ Status strip ═══ */
+.strip{display:none;gap:20px;padding:8px 24px;background:rgba(13,13,20,.6);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--b3);font:500 11px 'JetBrains Mono',monospace;color:var(--t4);align-items:center;z-index:10;position:relative}
+.strip .lbl{display:flex;gap:5px;align-items:center}.strip .val{color:var(--t1);font-weight:700}
+.pbar{flex:1;height:3px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden}
+.pfill{height:100%;border-radius:2px;transition:width .5s;background:linear-gradient(90deg,var(--cyan),var(--pur))}
+.ast{padding:3px 12px;border-radius:999px;font:700 9px 'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:1px}
+.ast-idle{background:rgba(255,255,255,.04);color:var(--t4)}
+.ast-thinking{background:rgba(255,230,0,.08);color:var(--ylw)}
+.ast-acting{background:rgba(0,255,242,.08);color:var(--cyan)}
+.ast-done{background:rgba(77,220,118,.08);color:var(--grn)}
+
+/* ═══ Layout ═══ */
+.main{display:grid;grid-template-columns:1fr 400px;height:calc(100vh - 86px);position:relative;z-index:2}
+.main.arena{grid-template-columns:1fr 1fr}
+.left{display:flex;flex-direction:column;overflow:hidden}
+.topo-box{height:220px;border-bottom:1px solid var(--b3);flex-shrink:0;position:relative;display:none}
+.topo-box canvas{width:100%;height:100%}
+.card-scroll{flex:1;overflow-y:auto;padding:16px 20px}
+.card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+
+/* ═══ Service cards — Ping stat-card recipe ═══ */
+.card{padding:16px;border-radius:16px;transition:transform .2s,box-shadow .2s;cursor:default;position:relative}
+.card:hover{transform:translateY(-2px)}
+.card.st-healthy{background:rgba(77,220,118,.03);border:1px solid rgba(77,220,118,.08)}
+.card.st-degraded{background:rgba(255,230,0,.04);border:1px solid rgba(255,230,0,.10)}
+.card.st-failing{background:rgba(255,128,0,.05);border:1px solid rgba(255,128,0,.12)}
+.card.st-down{background:rgba(255,107,107,.06);border:1px solid rgba(255,107,107,.15);box-shadow:0 0 20px rgba(255,107,107,.06)}
+.card.hl{border-color:rgba(0,255,242,.4)!important;box-shadow:0 0 20px rgba(0,255,242,.08)!important}
+.card-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.card-name{font:600 13px 'JetBrains Mono',monospace;letter-spacing:.3px;color:var(--t1)}
+.pill{font:700 8px 'JetBrains Mono',monospace;padding:3px 8px;border-radius:999px;text-transform:uppercase;letter-spacing:1px}
+.pill-gateway{background:rgba(153,51,255,.10);color:rgba(153,51,255,.8);border:1px solid rgba(153,51,255,.15)}
+.pill-api{background:rgba(0,255,242,.08);color:rgba(0,209,224,.9);border:1px solid rgba(0,255,242,.12)}
+.pill-cache{background:rgba(255,0,204,.08);color:rgba(255,0,204,.7);border:1px solid rgba(255,0,204,.12)}
+.pill-database{background:rgba(255,128,0,.08);color:rgba(255,128,0,.8);border:1px solid rgba(255,128,0,.12)}
+.pill-worker{background:rgba(255,230,0,.08);color:rgba(255,230,0,.8);border:1px solid rgba(255,230,0,.12)}
+.pill-queue{background:rgba(77,220,118,.08);color:rgba(77,220,118,.9);border:1px solid rgba(77,220,118,.12)}
+.card-status{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.card-st-left{display:flex;align-items:center;gap:6px}
+.dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.dot-healthy{background:var(--grn);box-shadow:0 0 4px rgba(77,220,118,.5)}
+.dot-degraded{background:var(--ylw);box-shadow:0 0 4px rgba(255,230,0,.5)}
+.dot-failing{background:var(--org);box-shadow:0 0 4px rgba(255,128,0,.5)}
+.dot-down{background:var(--red);box-shadow:0 0 6px rgba(255,107,107,.6);animation:blink 1s infinite}
+.card-st-txt{font:600 10px 'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.8px;color:var(--t3)}
+.card-hp{font:700 20px 'JetBrains Mono',monospace}
+.mets{display:grid;grid-template-columns:1fr 1fr;gap:4px 16px}
+.met{display:flex;justify-content:space-between;font:500 10px 'JetBrains Mono',monospace}
+.met-l{color:var(--t5)}.met-v{color:var(--t2)}
+.mv-w{color:rgba(255,230,0,.85)}.mv-c{color:rgba(255,107,107,.9)}
+.spark{margin-top:10px;height:28px}.spark svg{width:100%;height:100%}
+.spark-line{fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}.spark-area{opacity:.1}
+.hbar{height:2px;background:rgba(255,255,255,.06);border-radius:1px;margin-top:10px;overflow:hidden}
+.hfill{height:100%;border-radius:1px;transition:width .5s,background .5s}
+
+/* ═══ Right panel / feed ═══ */
+.right{border-left:1px solid var(--b3);display:flex;flex-direction:column;overflow:hidden}
+.sec-hdr{padding:12px 20px;background:rgba(13,13,20,.5);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--b3);font:700 11px 'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:3px;color:var(--t4);display:flex;justify-content:space-between;align-items:center}
+.feed{flex:1;overflow-y:auto;padding:0;scroll-behavior:smooth}
+.fe{padding:12px 16px;border-bottom:1px solid var(--b3);animation:feIn .25s ease;border-left:2px solid transparent}
+@keyframes feIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.fe.thought{border-left-color:rgba(255,230,0,.5);background:rgba(255,230,0,.015)}
+.fe.action{border-left-color:rgba(0,255,242,.5);background:rgba(0,255,242,.015)}
+.fe.result{border-left-color:rgba(77,220,118,.4)}
+.fe.error{border-left-color:rgba(255,107,107,.5);background:rgba(255,107,107,.02)}
+.fe.done{border-left-color:rgba(153,51,255,.5);background:rgba(153,51,255,.02)}
+.ftag{font:700 8px 'JetBrains Mono',monospace;padding:2px 8px;border-radius:999px;text-transform:uppercase;letter-spacing:1px;display:inline-block;margin-bottom:5px}
+.ftag-think{background:rgba(255,230,0,.08);color:rgba(255,230,0,.8)}
+.ftag-act{background:rgba(0,255,242,.08);color:rgba(0,209,224,.9)}
+.ftag-res{background:rgba(77,220,118,.06);color:rgba(77,220,118,.8)}
+.ftag-err{background:rgba(255,107,107,.08);color:rgba(255,107,107,.9)}
+.ftag-done{background:rgba(153,51,255,.08);color:rgba(153,51,255,.8)}
+.ftxt{font:400 12px 'Inter',sans-serif;line-height:1.7;color:var(--t2)}
+.ftxt.mono{font:500 11px 'JetBrains Mono',monospace;color:var(--t3);white-space:pre-wrap;word-break:break-all;max-height:120px;overflow-y:auto;line-height:1.6}
+
+/* ═══ Arena ═══ */
+.arena-wrap{display:grid;grid-template-columns:1fr 1fr;height:100%}
+.arena-lane{display:flex;flex-direction:column;overflow:hidden}
+.arena-lane:first-child{border-right:1px solid var(--b3)}
+.lane-hdr{padding:10px 16px;background:rgba(13,13,20,.5);border-bottom:1px solid var(--b3);font:700 11px 'JetBrains Mono',monospace;display:flex;justify-content:space-between;align-items:center;letter-spacing:.5px}
+.lane-sc{font:800 13px 'JetBrains Mono',monospace}
+
+/* ═══ Score overlay — Ping glassmorphic panel ═══ */
+.ov{display:none;position:fixed;inset:0;background:rgba(8,5,16,.7);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);z-index:200;justify-content:center;align-items:center}
+.ov.active{display:flex}
+.sc{background:var(--panel);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-radius:20px;padding:40px 48px;min-width:460px;text-align:center;box-shadow:0 0 30px rgba(0,255,242,.06);position:relative;animation:scIn .4s cubic-bezier(.3,.7,.4,1)}
+.sc::before{content:'';position:absolute;inset:0;border-radius:20px;padding:1.5px;background:linear-gradient(135deg,rgba(0,255,242,.5),rgba(153,51,255,.25));-webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none}
+@keyframes scIn{from{transform:scale(.95);opacity:0}to{transform:scale(1);opacity:1}}
+.sc h2{font:700 11px 'JetBrains Mono',monospace;color:var(--t4);text-transform:uppercase;letter-spacing:3px}
+.sc-num{font:800 56px 'JetBrains Mono',monospace;margin:16px 0}
+.sc-good{color:var(--grn);text-shadow:0 0 20px rgba(77,220,118,.3)}
+.sc-ok{color:var(--ylw);text-shadow:0 0 20px rgba(255,230,0,.3)}
+.sc-bad{color:var(--red);text-shadow:0 0 20px rgba(255,107,107,.3)}
+.sc-sub{color:var(--t4);font:500 12px 'JetBrains Mono',monospace;letter-spacing:1px}
+.sc-rows{text-align:left;margin-top:28px}
+.sc-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;font:500 12px 'JetBrains Mono',monospace;color:var(--t3);border-bottom:1px solid var(--b3)}
+.sc-row:last-child{border-bottom:none}
+.sc-bar{width:100px;height:4px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden;margin-left:10px}
+.sc-bar-f{height:100%;border-radius:2px;transition:width .8s cubic-bezier(.4,0,.2,1)}
+.sc-meta{margin-top:20px;padding-top:20px;border-top:1px solid var(--b1);font:500 11px 'JetBrains Mono',monospace;color:var(--t4);display:flex;gap:24px;justify-content:center}
+.sc-close{margin-top:28px;padding:12px 36px;background:linear-gradient(90deg,var(--accent),var(--mint));color:#000;font:600 12px 'JetBrains Mono',monospace;border:none;border-radius:999px;cursor:pointer;letter-spacing:1px;box-shadow:0 4px 16px rgba(0,209,224,.25);transition:all .2s}
+.sc-close:hover{box-shadow:0 6px 24px rgba(0,209,224,.4);transform:translateY(-1px)}
+
+/* ═══ Empty state ═══ */
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;text-align:center;gap:6px;padding:40px}
+.empty-t{font:700 20px 'JetBrains Mono',monospace;letter-spacing:4px;color:var(--t1)}
+.empty-t span{color:var(--cyan)}
+.empty-sub{font:400 13px 'Inter',sans-serif;color:var(--t4);max-width:380px;line-height:1.8;margin:8px 0 20px}
+.empty-keys{display:flex;gap:24px}
+.ek{text-align:center;color:var(--t4);font:500 10px 'JetBrains Mono',monospace;letter-spacing:.5px}
+.ek kbd{display:block;padding:6px 12px;border-radius:8px;background:rgba(255,255,255,.04);border:1px solid var(--b1);font:600 12px 'JetBrains Mono',monospace;color:var(--t2);margin-bottom:6px}
+
+/* ═══ Manual tools ═══ */
+.mtpanel{display:none;padding:12px 16px;border-bottom:1px solid var(--b3);max-height:38%;overflow-y:auto;background:rgba(13,13,20,.5)}
+.mtpanel.active{display:block}
+.mt-g{font:700 8px 'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:2px;color:var(--t5);margin:12px 0 4px}.mt-g:first-child{margin-top:0}
+.mt-b{display:block;width:100%;text-align:left;background:rgba(255,255,255,.03);border:1px solid var(--b3);color:var(--t2);padding:6px 10px;border-radius:8px;font:500 11px 'JetBrains Mono',monospace;cursor:pointer;margin-bottom:3px;transition:all .15s}
+.mt-b:hover{border-color:rgba(0,255,242,.2);color:var(--t1);background:rgba(255,255,255,.05)}
+.mt-b.act{border-left:2px solid rgba(255,128,0,.4)}.mt-b.read{border-left:2px solid rgba(0,255,242,.3)}
+.pop{display:none;background:rgba(13,13,20,.95);border:1.5px solid rgba(0,255,242,.2);border-radius:12px;padding:12px;margin-bottom:8px;box-shadow:0 0 20px rgba(0,255,242,.05)}
+.pop.active{display:block}
+.pop label{display:block;font:500 9px 'JetBrains Mono',monospace;color:var(--t4);margin-bottom:3px;text-transform:uppercase;letter-spacing:.5px}
+.pop input,.pop select{width:100%;background:rgba(255,255,255,.04);border:1px solid var(--b1);color:var(--t1);padding:6px 10px;border-radius:8px;font:500 11px 'JetBrains Mono',monospace;margin-bottom:8px;outline:none}
+.pop input:focus,.pop select:focus{border-color:rgba(0,255,242,.3)}
+.pop-row{display:flex;gap:8px}.pop-row button{flex:1;padding:8px;border-radius:8px;font:600 10px 'JetBrains Mono',monospace;cursor:pointer;border:none;letter-spacing:.5px}
+.pop-go{background:var(--accent);color:#000}.pop-no{background:rgba(255,255,255,.06);color:var(--t2)}
+</style>
+</head>
+<body>
+
+<div class="bg"><div class="orb o1"></div><div class="orb o2"></div><div class="orb o3"></div></div>
+<div class="scan"></div>
+
+<header class="hdr">
+  <div class="logo"><div class="logo-dot" id="lp"></div><h1>INCIDENTROOM <span>v2</span></h1></div>
+  <div class="ctrls">
+    <select class="sel" id="diff"><option value="easy">EASY</option><option value="medium">MEDIUM</option><option value="hard">HARD</option></select>
+    <input class="seed-input" id="seed" type="number" value="42" title="Seed">
+    <button class="btn btn-run" id="brun">RUN AGENT</button>
+    <button class="btn btn-arena" id="barena">ARENA</button>
+    <button class="btn btn-manual" id="bman">MANUAL</button>
+    <button class="btn btn-stop" id="bstop">STOP</button>
+    <button class="mute" id="bmute" title="Sound">&#x1f50a;</button>
+  </div>
+</header>
+
+<div class="strip" id="strip">
+  <div class="lbl">TICK <span class="val" id="st-tick">0/20</span></div>
+  <div class="pbar"><div class="pfill" id="pfill"></div></div>
+  <div class="lbl">FAULTS <span class="val" id="st-faults">0/0</span></div>
+  <div class="lbl">IMPACT <span class="val" id="st-impact">0.0</span></div>
+  <span class="ast ast-idle" id="ast">IDLE</span>
+</div>
+
+<main class="main" id="layout">
+  <div class="left">
+    <div class="topo-box" id="topowrap"><canvas id="topo"></canvas></div>
+    <div class="card-scroll">
+      <div class="empty" id="emptyState">
+        <div class="empty-t">INCIDENTROOM <span>v2</span></div>
+        <div class="empty-sub">Tick-based SRE incident simulator. Services degrade, faults cascade, and the agent must diagnose and remediate before the budget runs out.</div>
+        <div class="empty-keys">
+          <div class="ek"><kbd>R</kbd>Run Agent</div>
+          <div class="ek"><kbd>A</kbd>Arena</div>
+          <div class="ek"><kbd>M</kbd>Manual</div>
+        </div>
+      </div>
+      <div class="card-grid" id="sgrid"></div>
+    </div>
+  </div>
+  <div class="right" id="rightPanel">
+    <div class="sec-hdr"><span id="feedTitle">Agent Feed</span></div>
+    <div class="mtpanel" id="mtpanel">
+      <div id="pop" class="pop"></div>
+      <div class="mt-g">Read</div>
+      <button class="mt-b read" data-t="list_services">list_services()</button>
+      <button class="mt-b read" data-t="get_metrics" data-p="service">get_metrics(svc)</button>
+      <button class="mt-b read" data-t="get_logs" data-p="service,n">get_logs(svc, n)</button>
+      <button class="mt-b read" data-t="get_topology">get_topology()</button>
+      <button class="mt-b read" data-t="get_recent_changes" data-p="service">get_recent_changes(svc)</button>
+      <div class="mt-g">Action</div>
+      <button class="mt-b act" data-t="restart_pod" data-p="service">restart_pod(svc)</button>
+      <button class="mt-b act" data-t="rollback" data-p="service">rollback(svc)</button>
+      <button class="mt-b act" data-t="scale_up" data-p="service">scale_up(svc)</button>
+      <button class="mt-b act" data-t="toggle_feature_flag" data-p="service,flag_name">toggle_flag(svc, flag)</button>
+      <button class="mt-b act" data-t="enable_circuit_breaker" data-p="service">circuit_breaker(svc)</button>
+      <button class="mt-b act" data-t="drain_region" data-p="region">drain_region(region)</button>
+      <button class="mt-b act" data-t="kill_long_queries" data-p="service">kill_long_queries(svc)</button>
+      <button class="mt-b act" data-t="rotate_cert" data-p="service_a,service_b">rotate_cert(a, b)</button>
+    </div>
+    <div class="feed" id="feed">
+      <div class="empty" id="feedEmpty"><p style="color:var(--t4);font:500 11px 'JetBrains Mono',monospace;letter-spacing:.5px">> awaiting initialization...</p></div>
+    </div>
+  </div>
+</main>
+
+<div class="ov" id="ov">
+  <div class="sc">
+    <h2 id="scTitle">EPISODE COMPLETE</h2>
+    <div class="sc-num" id="scNum">0</div>
+    <div class="sc-sub">OUT OF 100</div>
+    <div class="sc-rows" id="scRows"></div>
+    <div class="sc-meta" id="scMeta"></div>
+    <button class="sc-close" onclick="document.getElementById('ov').classList.remove('active')">CONTINUE</button>
+  </div>
+</div>
+
+<script>
+const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
+let ST=null,muted=false,running=false,es=null,arenaMode=false;
+
+/* ═══ Sound ═══ */
+const AC=new(window.AudioContext||window.webkitAudioContext)();
+function beep(f,d,t='sine',v=.06){if(muted)return;AC.resume();const o=AC.createOscillator(),g=AC.createGain();o.type=t;o.frequency.value=f;g.gain.value=v;o.connect(g);g.connect(AC.destination);o.start();g.gain.exponentialRampToValueAtTime(.001,AC.currentTime+d);o.stop(AC.currentTime+d)}
+function sndClick(){beep(800,.04,'square',.03)}
+function sndAlert(){beep(220,.25,'sawtooth',.05);setTimeout(()=>beep(180,.25,'sawtooth',.04),250)}
+function sndResolve(){beep(523,.12);setTimeout(()=>beep(659,.12),120);setTimeout(()=>beep(784,.18),240)}
+function sndFail(){beep(330,.2);setTimeout(()=>beep(220,.25),180)}
+function sndWin(){beep(523,.1);setTimeout(()=>beep(659,.1),100);setTimeout(()=>beep(784,.1),200);setTimeout(()=>beep(1047,.2),300)}
+$('#bmute').onclick=()=>{muted=!muted;$('#bmute').textContent=muted?'\u{1f507}':'\u{1f50a}'};
+
+/* ═══ API ═══ */
+async function api(url,body){const o=body!==undefined?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{};return(await fetch(url,o)).json()}
+
+/* ═══ Restore panel after arena ═══ */
+function restoreRight(){
+  const rp=$('#rightPanel');
+  rp.innerHTML=`<div class="sec-hdr"><span id="feedTitle">Agent Feed</span></div>
+    <div class="mtpanel" id="mtpanel"><div id="pop" class="pop"></div>
+    <div class="mt-g">Read</div>
+    <button class="mt-b read" data-t="list_services">list_services()</button>
+    <button class="mt-b read" data-t="get_metrics" data-p="service">get_metrics(svc)</button>
+    <button class="mt-b read" data-t="get_logs" data-p="service,n">get_logs(svc, n)</button>
+    <button class="mt-b read" data-t="get_topology">get_topology()</button>
+    <button class="mt-b read" data-t="get_recent_changes" data-p="service">get_recent_changes(svc)</button>
+    <div class="mt-g">Action</div>
+    <button class="mt-b act" data-t="restart_pod" data-p="service">restart_pod(svc)</button>
+    <button class="mt-b act" data-t="rollback" data-p="service">rollback(svc)</button>
+    <button class="mt-b act" data-t="scale_up" data-p="service">scale_up(svc)</button>
+    <button class="mt-b act" data-t="toggle_feature_flag" data-p="service,flag_name">toggle_flag(svc, flag)</button>
+    <button class="mt-b act" data-t="enable_circuit_breaker" data-p="service">circuit_breaker(svc)</button>
+    <button class="mt-b act" data-t="drain_region" data-p="region">drain_region(region)</button>
+    <button class="mt-b act" data-t="kill_long_queries" data-p="service">kill_long_queries(svc)</button>
+    <button class="mt-b act" data-t="rotate_cert" data-p="service_a,service_b">rotate_cert(a, b)</button></div>
+    <div class="feed" id="feed"><div class="empty" id="feedEmpty"><p style="color:var(--t4);font:500 11px 'JetBrains Mono',monospace">> awaiting initialization...</p></div></div>`;
+}
+
+/* ═══ Run Agent ═══ */
+$('#brun').onclick=()=>{if(running)return;startAgent()};
+function startAgent(){
+  running=true;arenaMode=false;$('#layout').classList.remove('arena');
+  if(!$('#feed'))restoreRight();
+  $('#brun').disabled=true;$('#bstop').style.display='inline-block';
+  const mt=$('#mtpanel');if(mt)mt.classList.remove('active');
+  const fe=$('#feedEmpty');if(fe)fe.style.display='none';
+  const fd=$('#feed');if(fd)fd.innerHTML='';
+  const ft=$('#feedTitle');if(ft)ft.textContent='Smart Agent';
+  setAst('thinking','Starting');
+  const seed=parseInt($('#seed').value)||42,diff=$('#diff').value;
+  es=new EventSource(`/api/agent/run?seed=${seed}&difficulty=${diff}`);
+  es.addEventListener('reset',e=>{const d=JSON.parse(e.data);ST=d.state;renderAll(ST);addFE('think','Investigating incident...');setAst('thinking','Thinking')});
+  es.addEventListener('thought',e=>{const d=JSON.parse(e.data);setAst('thinking','Thinking');addFE('think',d.text)});
+  es.addEventListener('action',e=>{
+    const d=JSON.parse(e.data);sndClick();setAst('acting',d.tool);
+    ST=d.state;renderAll(ST);hlSvc(d.args.service||d.args.service_a);
+    addFE('act',`${d.tool}(${Object.entries(d.args).map(([k,v])=>`${k}=${v}`).join(', ')})`);fmtResult(d.result);
+    if(Object.values(d.state.services).some(s=>s.status==='down'))sndAlert();
+    if(d.state.faults_resolved>0&&d.state.faults_resolved===d.state.faults_total)sndResolve();
+  });
+  es.addEventListener('done',e=>{
+    const d=JSON.parse(e.data);ST=d.state;renderAll(ST);running=false;es.close();es=null;
+    $('#brun').disabled=false;$('#bstop').style.display='none';
+    const o=d.outcome;setAst('done',o==='success'?'Resolved':o);
+    addFE('done',`${o.toUpperCase()} — Score: ${d.grade.score.toFixed(1)}/100`);
+    o==='success'?sndWin():sndFail();showScore(d.grade,o);
+  });
+  es.onerror=()=>{running=false;if(es)es.close();es=null;$('#brun').disabled=false;$('#bstop').style.display='none';setAst('idle','Error')};
+}
+$('#bstop').onclick=()=>{if(es){es.close();es=null}running=false;$('#brun').disabled=false;$('#bstop').style.display='none';setAst('idle','Stopped')};
+
+/* ═══ Arena ═══ */
+$('#barena').onclick=()=>{if(running)return;startArena()};
+function startArena(){
+  running=true;arenaMode=true;$('#brun').disabled=true;$('#bstop').style.display='inline-block';
+  $('#layout').classList.add('arena');
+  $('#rightPanel').innerHTML=`<div class="arena-wrap">
+    <div class="arena-lane"><div class="lane-hdr"><span style="color:var(--grn)">SMART AGENT</span><span class="lane-sc" id="lsA">--</span></div><div class="feed" id="feedA"></div></div>
+    <div class="arena-lane"><div class="lane-hdr"><span style="color:var(--org)">NAIVE AGENT</span><span class="lane-sc" id="lsB">--</span></div><div class="feed" id="feedB"></div></div></div>`;
+  setAst('thinking','Arena');
+  const seed=parseInt($('#seed').value)||42,diff=$('#diff').value;
+  es=new EventSource(`/api/arena/run?seed=${seed}&difficulty=${diff}`);
+  es.addEventListener('reset',e=>{const d=JSON.parse(e.data);ST=d.a.state;renderAll(ST);addA('a','think','Same incident, different strategies.');addA('b','think','Naive: restart everything.')});
+  es.addEventListener('thought',e=>{const d=JSON.parse(e.data);addA(d.lane,'think',d.text)});
+  es.addEventListener('action',e=>{
+    const d=JSON.parse(e.data);sndClick();if(d.lane==='a'){ST=d.state;renderAll(ST)}
+    addA(d.lane,'act',`${d.tool}(${Object.entries(d.args).map(([k,v])=>`${k}=${v}`).join(', ')})`);
+    const el=document.getElementById(d.lane==='a'?'lsA':'lsB');
+    if(el)el.textContent=`${d.state.faults_resolved}/${d.state.faults_total} | T${d.state.tick}`;
+  });
+  es.addEventListener('done',e=>{
+    const d=JSON.parse(e.data);running=false;es.close();es=null;$('#brun').disabled=false;$('#bstop').style.display='none';
+    const ga=d.grade_a,gb=d.grade_b;
+    const la=document.getElementById('lsA'),lb=document.getElementById('lsB');
+    if(la)la.innerHTML=`<span style="color:${ga.score>gb.score?'var(--grn)':'var(--red)'}">${ga.score.toFixed(1)}</span>`;
+    if(lb)lb.innerHTML=`<span style="color:${gb.score>ga.score?'var(--grn)':'var(--red)'}">${gb.score.toFixed(1)}</span>`;
+    addA('a','done',`Score: ${ga.score.toFixed(1)}`);addA('b','done',`Score: ${gb.score.toFixed(1)}`);
+    setAst('done','Complete');ga.score>gb.score?sndWin():sndFail();showArena(ga,gb);
+  });
+  es.onerror=()=>{running=false;if(es)es.close();es=null;$('#brun').disabled=false;$('#bstop').style.display='none'};
+}
+function addA(lane,type,text){
+  const f=document.getElementById(lane==='a'?'feedA':'feedB');if(!f)return;
+  const cls=type==='think'?'thought':type==='act'?'action':type==='err'?'error':type==='done'?'done':'result';
+  const tags={think:'ftag-think',act:'ftag-act',done:'ftag-done'};
+  const labels={think:'THINK',act:'ACTION',done:'DONE'};
+  const d=document.createElement('div');d.className=`fe ${cls}`;
+  d.innerHTML=`<span class="ftag ${tags[type]||'ftag-res'}">${labels[type]||'RESULT'}</span><div class="ftxt">${esc(text)}</div>`;
+  f.appendChild(d);f.scrollTop=f.scrollHeight;
+}
+
+/* ═══ Manual ═══ */
+$('#bman').onclick=async()=>{
+  if(running)return;arenaMode=false;$('#layout').classList.remove('arena');
+  if(!$('#feed'))restoreRight();
+  const seed=parseInt($('#seed').value)||42,diff=$('#diff').value;
+  await api('/api/reset',{seed,difficulty:diff});
+  const st=await api('/api/state');ST=st;renderAll(st);
+  $('#mtpanel').classList.add('active');$('#feedTitle').textContent='Manual Mode';
+  const fe=$('#feedEmpty');if(fe)fe.style.display='none';
+  const fd=$('#feed');if(fd)fd.innerHTML='';
+  addFE('think','Manual mode. Use tools to investigate and remediate.');setAst('idle','Manual');
+  $$('.mt-b').forEach(b=>{b.onclick=()=>{const t=b.dataset.t,p=b.dataset.p;if(!p)execM(t,{});else showPop(t,p.split(','))}});
+};
+function showPop(tool,params){
+  const p=$('#pop');
+  let h=`<div style="font:600 11px 'JetBrains Mono',monospace;color:var(--cyan);margin-bottom:8px">${tool}</div>`;
+  params.forEach(k=>{
+    if(k==='service'&&ST){h+=`<label>${k}</label><select id="pp-${k}">`+Object.keys(ST.services).map(s=>`<option>${s}</option>`).join('')+`</select>`}
+    else if(k==='n'){h+=`<label>${k}</label><input id="pp-${k}" type="number" value="20">`}
+    else{h+=`<label>${k}</label><input id="pp-${k}" type="text">`}
+  });
+  h+=`<div class="pop-row"><button class="pop-no" onclick="document.getElementById('pop').classList.remove('active')">Cancel</button><button class="pop-go" id="ppx">Execute</button></div>`;
+  p.innerHTML=h;p.classList.add('active');
+  document.getElementById('ppx').onclick=()=>{const args={};params.forEach(k=>{const e=document.getElementById('pp-'+k);if(e&&e.value.trim())args[k]=k==='n'?parseInt(e.value):e.value.trim()});p.classList.remove('active');execM(tool,args)};
+}
+async function execM(tool,args){
+  sndClick();addFE('act',`${tool}(${Object.entries(args).map(([k,v])=>`${k}=${v}`).join(', ')})`);setAst('acting',tool);
+  const obs=await api('/api/step',{tool_name:tool,args});
+  ST=await api('/api/state');renderAll(ST);hlSvc(args.service||args.service_a);fmtResult(obs.tool_result);
+  if(obs.done){setAst('done',obs.tick.outcome);if(obs.grade)showScore(obs.grade,obs.tick.outcome);obs.tick.outcome==='success'?sndWin():sndFail()}
+  else setAst('idle','Manual');
+}
+
+/* ═══ Render ═══ */
+const SC={healthy:'#4DDC76',degraded:'#FFE600',failing:'#FF8000',down:'#FF6B6B'};
+function renderAll(st){$('#emptyState').style.display='none';$('#strip').style.display='flex';updateStrip(st);renderCards(st);drawTopo(st)}
+function updateStrip(st){
+  $('#st-tick').textContent=`${st.tick}/${st.max_ticks}`;
+  $('#pfill').style.width=`${(st.tick/st.max_ticks)*100}%`;
+  $('#st-faults').textContent=`${st.faults_resolved}/${st.faults_total}`;
+  $('#st-impact').textContent=st.user_impact_total.toFixed(1);
+}
+function renderCards(st){
+  const g=$('#sgrid');g.innerHTML='';
+  Object.values(st.services).forEach(s=>{
+    const hp=(s.health*100).toFixed(0);
+    const hc=SC[s.status]||SC.healthy;
+    const mc=(v,w,c)=>v>=c?'mv-c':v>=w?'mv-w':'';
+    const hist=s.history||[];let spark='';
+    if(hist.length>1){
+      const W=200,H=28,pts=hist.map((p,i)=>`${(i/(hist.length-1))*W},${H-(p.h*H)}`);
+      const line='M'+pts.join('L'),area=line+`L${W},${H}L0,${H}Z`;
+      spark=`<div class="spark"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><path d="${area}" class="spark-area" fill="${hc}"/><path d="${line}" class="spark-line" stroke="${hc}"/></svg></div>`;
+    }
+    const d=document.createElement('div');d.className=`card st-${s.status}`;d.id=`svc-${s.name}`;
+    d.innerHTML=`<div class="card-top"><span class="card-name">${s.name}</span><span class="pill pill-${s.kind}">${s.kind}</span></div>
+      <div class="card-status"><div class="card-st-left"><div class="dot dot-${s.status}"></div><span class="card-st-txt" style="color:${hc}">${s.status}${s.restart_cooldown?' (restarting)':''}</span></div><span class="card-hp" style="color:${hc}">${hp}%</span></div>
+      <div class="mets">
+        <div class="met"><span class="met-l">err</span><span class="met-v ${mc(s.error_rate,.05,.2)}">${s.error_rate.toFixed(4)}</span></div>
+        <div class="met"><span class="met-l">lat</span><span class="met-v ${mc(s.latency_p99,150,500)}">${s.latency_p99.toFixed(0)}ms</span></div>
+        <div class="met"><span class="met-l">cpu</span><span class="met-v ${mc(s.cpu_pct,70,90)}">${s.cpu_pct.toFixed(1)}%</span></div>
+        <div class="met"><span class="met-l">mem</span><span class="met-v ${mc(s.memory_pct,75,90)}">${s.memory_pct.toFixed(1)}%</span></div>
+      </div>${spark}<div class="hbar"><div class="hfill" style="width:${hp}%;background:${hc}"></div></div>`;
+    g.appendChild(d);
+  });
+}
+
+/* ═══ Topology ═══ */
+let topoRAF=null;
+function drawTopo(st){
+  const wrap=$('#topowrap');wrap.style.display='block';
+  const cvs=$('#topo'),ctx=cvs.getContext('2d');
+  const W=wrap.clientWidth,H=wrap.clientHeight;
+  cvs.width=W*2;cvs.height=H*2;cvs.style.width=W+'px';cvs.style.height=H+'px';
+  ctx.scale(2,2);ctx.clearRect(0,0,W,H);
+
+  const svcs=Object.values(st.services),n=svcs.length;if(!n)return;
+
+  // Grid
+  ctx.fillStyle='rgba(255,255,255,.025)';
+  for(let x=0;x<W;x+=28)for(let y=0;y<H;y+=28){ctx.beginPath();ctx.arc(x,y,.5,0,Math.PI*2);ctx.fill()}
+
+  const cx=W/2,cy=H/2,r=Math.min(W,H)/2-44,pos={};
+  svcs.forEach((s,i)=>{const a=(i/n)*Math.PI*2-Math.PI/2;pos[s.name]={x:cx+r*Math.cos(a),y:cy+r*Math.sin(a)}});
+
+  const KC={gateway:'#9933FF',api:'#00D1E0',cache:'#FF00CC',database:'#FF8000',worker:'#FFE600',queue:'#4DDC76'};
+
+  // Edges
+  Object.entries(st.topology).forEach(([src,deps])=>{
+    deps.forEach(dep=>{
+      if(!pos[src]||!pos[dep])return;
+      const p1=pos[src],p2=pos[dep],ss=st.services[src],bad=ss&&ss.status!=='healthy';
+      ctx.beginPath();ctx.moveTo(p1.x,p1.y);ctx.lineTo(p2.x,p2.y);
+      ctx.strokeStyle=bad?'rgba(255,107,107,.2)':'rgba(255,255,255,.06)';
+      ctx.lineWidth=bad?1.5:1;ctx.stroke();
+      const ang=Math.atan2(p2.y-p1.y,p2.x-p1.x),mx=(p1.x+p2.x)/2,my=(p1.y+p2.y)/2;
+      ctx.beginPath();ctx.moveTo(mx+4*Math.cos(ang),my+4*Math.sin(ang));
+      ctx.lineTo(mx-3*Math.cos(ang-.4),my-3*Math.sin(ang-.4));
+      ctx.lineTo(mx-3*Math.cos(ang+.4),my-3*Math.sin(ang+.4));
+      ctx.closePath();ctx.fillStyle=ctx.strokeStyle;ctx.fill();
+    });
+  });
+
+  // Pulse particles
+  const now=performance.now();
+  Object.entries(st.topology).forEach(([src,deps])=>{
+    const ss=st.services[src];if(!ss||ss.status==='healthy')return;
+    deps.forEach((dep,di)=>{
+      if(!pos[src]||!pos[dep])return;
+      const p1=pos[src],p2=pos[dep],t=((now/1200+di*.4)%1.8)/1.8;
+      const px=p1.x+(p2.x-p1.x)*t,py=p1.y+(p2.y-p1.y)*t;
+      ctx.beginPath();ctx.arc(px,py,2,0,Math.PI*2);
+      ctx.fillStyle=`rgba(255,107,107,${(.6*(1-t)).toFixed(2)})`;ctx.fill();
+    });
+  });
+
+  // Nodes
+  svcs.forEach(s=>{
+    const p=pos[s.name];if(!p)return;
+    const sc=SC[s.status],kc=KC[s.kind]||'#00D1E0';
+    if(s.status!=='healthy'){
+      ctx.beginPath();ctx.arc(p.x,p.y,20,0,Math.PI*2);
+      const g=ctx.createRadialGradient(p.x,p.y,8,p.x,p.y,20);
+      g.addColorStop(0,sc+'30');g.addColorStop(1,'transparent');ctx.fillStyle=g;ctx.fill();
+    }
+    ctx.beginPath();ctx.arc(p.x,p.y,11,0,Math.PI*2);ctx.fillStyle=kc;ctx.globalAlpha=.85;ctx.fill();ctx.globalAlpha=1;
+    ctx.strokeStyle=sc;ctx.lineWidth=2;ctx.stroke();
+    ctx.save();ctx.shadowColor='rgba(0,0,0,.8)';ctx.shadowBlur=3;
+    ctx.fillStyle='rgba(255,255,255,.75)';ctx.font='500 8px "JetBrains Mono",monospace';ctx.textAlign='center';
+    ctx.fillText(s.name,p.x,p.y+22);ctx.restore();
+  });
+
+  if(topoRAF)cancelAnimationFrame(topoRAF);
+  if(svcs.some(s=>s.status!=='healthy'))topoRAF=requestAnimationFrame(()=>drawTopo(st));
+}
+
+/* ═══ Feed ═══ */
+function addFE(type,text){
+  const f=$('#feed');if(!f)return;
+  const cls=type==='think'?'thought':type==='act'?'action':type==='err'?'error':type==='done'?'done':'result';
+  const tags={think:'ftag-think',act:'ftag-act',res:'ftag-res',err:'ftag-err',done:'ftag-done'};
+  const labels={think:'THINKING',act:'ACTION',res:'RESULT',err:'ERROR',done:'COMPLETE'};
+  const d=document.createElement('div');d.className=`fe ${cls}`;
+  d.innerHTML=`<span class="ftag ${tags[type]}">${labels[type]||type}</span><div class="ftxt">${esc(text)}</div>`;
+  f.appendChild(d);f.scrollTop=f.scrollHeight;
+}
+function addMono(text){
+  const f=$('#feed');if(!f)return;
+  const d=document.createElement('div');d.className='fe result';
+  d.innerHTML=`<span class="ftag ftag-res">RESULT</span><div class="ftxt mono">${esc(text)}</div>`;
+  f.appendChild(d);f.scrollTop=f.scrollHeight;
+}
+function fmtResult(r){
+  if(r.error){addFE('err',r.error);return}
+  if(r.logs){addMono(r.logs.slice(-6).map(l=>l.msg).join('\n'));return}
+  if(r.services){addMono(r.services.map(s=>`${s.name.padEnd(22)} ${s.status}`).join('\n'));return}
+  if(r.topology){addMono(Object.entries(r.topology).map(([n,i])=>`${n.padEnd(22)} -> [${i.dependencies.join(', ')}]`).join('\n'));return}
+  if(r.changes!==undefined){const p=r.changes.map(c=>JSON.stringify(c));if(r.config_flags&&Object.keys(r.config_flags).length)p.push(`flags: ${JSON.stringify(r.config_flags)}`);addMono(p.join('\n')||'(none)');return}
+  addMono(Object.entries(r).map(([k,v])=>`${k}: ${v}`).join('\n'));
+}
+
+/* ═══ Helpers ═══ */
+function setAst(type,text){const e=$('#ast');if(!e)return;e.className=`ast ast-${type}`;e.textContent=text;const lp=$('#lp');if(lp){const c={thinking:'#FFE600',acting:'#00D1E0',done:'#4DDC76',idle:'#FF6B6B'};lp.style.background=c[type]||c.idle;lp.style.boxShadow=`0 0 8px ${c[type]||c.idle}`}}
+function hlSvc(name){$$('.card').forEach(c=>c.classList.remove('hl'));if(name){const e=document.getElementById(`svc-${name}`);if(e)e.classList.add('hl')}}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+
+/* ═══ Score ═══ */
+function showScore(g,outcome){
+  const titles={success:'INCIDENT RESOLVED',catastrophic:'CATASTROPHIC FAILURE',timeout:'BUDGET EXHAUSTED'};
+  $('#scTitle').textContent=titles[outcome]||'EPISODE OVER';
+  const n=$('#scNum');n.textContent=g.score.toFixed(1);
+  n.className=`sc-num ${g.score>=70?'sc-good':g.score>=40?'sc-ok':'sc-bad'}`;
+  const mx={fault_resolution:40,service_health:25,user_impact:20,efficiency:15};
+  let h='';Object.entries(g.breakdown).forEach(([k,v])=>{
+    const m=mx[k]||25,p=(v/m*100).toFixed(0);
+    const c=p>=70?'#4DDC76':p>=40?'#FFE600':'#FF6B6B';
+    h+=`<div class="sc-row"><span>${k.replace(/_/g,' ')}</span><span style="display:flex;align-items:center;gap:10px"><span style="color:var(--t2)">${v.toFixed(1)}/${m}</span><div class="sc-bar"><div class="sc-bar-f" style="width:${p}%;background:${c}"></div></div></span></div>`;
+  });$('#scRows').innerHTML=h;
+  $('#scMeta').innerHTML=`<span>Faults: ${g.faults_resolved}/${g.faults_total}</span><span>Ticks: ${g.final_tick}</span><span>Impact: ${g.user_impact_total.toFixed(1)}</span>`;
+  $('#ov').classList.add('active');
+}
+function showArena(ga,gb){
+  const w=ga.score>=gb.score?'SMART':'NAIVE';
+  $('#scTitle').textContent=`${w} AGENT WINS (+${Math.abs(ga.score-gb.score).toFixed(1)})`;
+  const n=$('#scNum');n.textContent=`${ga.score.toFixed(0)} \u2013 ${gb.score.toFixed(0)}`;
+  n.className=`sc-num ${ga.score>=gb.score?'sc-good':'sc-bad'}`;
+  const mx={fault_resolution:40,service_health:25,user_impact:20,efficiency:15};
+  let h='<div style="display:grid;grid-template-columns:1fr auto 1fr;gap:6px;font:500 11px JetBrains Mono,monospace;margin-top:8px">';
+  h+='<div style="text-align:right;color:var(--grn)">Smart</div><div></div><div style="color:var(--org)">Naive</div>';
+  Object.keys(mx).forEach(k=>{const va=ga.breakdown[k],vb=gb.breakdown[k],m=mx[k];h+=`<div style="text-align:right;color:var(--t2)">${va.toFixed(1)}/${m}</div><div style="color:var(--t5);text-align:center;font-size:9px">${k.replace(/_/g,' ')}</div><div style="color:var(--t2)">${vb.toFixed(1)}/${m}</div>`});
+  h+='</div>';$('#scRows').innerHTML=h;
+  $('#scMeta').innerHTML=`<span>Smart: ${ga.faults_resolved}/${ga.faults_total}</span><span>Naive: ${gb.faults_resolved}/${gb.faults_total}</span>`;
+  $('#ov').classList.add('active');
+}
+
+/* ═══ Keyboard ═══ */
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT')return;
+  if(e.key==='r'||e.key==='R'){e.preventDefault();$('#brun').click()}
+  if(e.key==='a'||e.key==='A'){e.preventDefault();$('#barena').click()}
+  if(e.key==='m'||e.key==='M'){e.preventDefault();$('#bman').click()}
+  if(e.key==='Escape'){$('#ov').classList.remove('active');$('#bstop').click()}
+  if(e.key==='s'||e.key==='S'){e.preventDefault();$('#bmute').click()}
+});
+</script>
+</body>
+</html>
