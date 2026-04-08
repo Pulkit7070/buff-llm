@@ -1,3 +1,13 @@
+---
+title: IncidentRoom
+emoji: "\U0001F6A8"
+colorFrom: red
+colorTo: blue
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 # IncidentRoom v2
 
 A procedurally generated SRE incident-response environment for the **Meta OpenEnv hackathon**.

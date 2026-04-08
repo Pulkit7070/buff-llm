@@ -1,15 +1,19 @@
 """IncidentRoom inference — OpenAI function-calling agent loop.
 
-Env vars:
-  API_BASE_URL  — OpenAI-compatible endpoint (default https://api.openai.com/v1)
-  MODEL_NAME    — model id (default gpt-4.1-mini)
-  HF_TOKEN      — API key (required)
+Mandatory env vars:
+  API_BASE_URL  — OpenAI-compatible endpoint
+  MODEL_NAME    — model id
+  HF_TOKEN      — API key
+
+Stdout format follows OpenEnv spec: [START], [STEP], [END].
+Each task returns score in [0.0, 1.0].
 """
 from __future__ import annotations
 
 import json
 import os
 import sys
+from typing import List, Optional
 
 from openai import OpenAI
 
@@ -18,6 +22,13 @@ from server.env import IncidentRoomEnv
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
+
+API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
+MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
+HF_TOKEN = os.getenv("HF_TOKEN") or os.getenv("API_KEY")
+BENCHMARK = "incidentroom"
+MAX_TURNS = 40
+TEMPERATURE = 0.7
 
 SYSTEM_PROMPT = """\
 You are an expert SRE responding to a live incident in a microservice system.
@@ -33,120 +44,162 @@ Strategy:
 6. Every tool call (even reads) costs one tick.  Be efficient.
 """
 
-EPISODES = [
-    {"seed": 42,   "difficulty": "easy"},
-    {"seed": 137,  "difficulty": "medium"},
-    {"seed": 256,  "difficulty": "hard"},
-    {"seed": 7,    "difficulty": "easy"},
-    {"seed": 1024, "difficulty": "medium"},
+# 3+ tasks with distinct difficulties (seed, difficulty)
+TASKS = [
+    {"name": "sre-incident-easy",   "seed": 42,   "difficulty": "easy"},
+    {"name": "sre-incident-medium", "seed": 137,  "difficulty": "medium"},
+    {"name": "sre-incident-hard",   "seed": 256,  "difficulty": "hard"},
 ]
 
-MAX_TURNS = 40  # safety cap per episode
+
+# ---------------------------------------------------------------------------
+# Logging helpers (strict OpenEnv format)
+# ---------------------------------------------------------------------------
+
+def log_start(task: str, env: str, model: str) -> None:
+    print(f"[START] task={task} env={env} model={model}", flush=True)
+
+
+def log_step(step: int, action: str, reward: float, done: bool, error: Optional[str]) -> None:
+    error_val = error if error else "null"
+    done_val = str(done).lower()
+    print(
+        f"[STEP] step={step} action={action} reward={reward:.2f} done={done_val} error={error_val}",
+        flush=True,
+    )
+
+
+def log_end(success: bool, steps: int, score: float, rewards: List[float]) -> None:
+    rewards_str = ",".join(f"{r:.2f}" for r in rewards)
+    success_val = str(success).lower()
+    print(
+        f"[END] success={success_val} steps={steps} score={score:.2f} rewards={rewards_str}",
+        flush=True,
+    )
 
 
 # ---------------------------------------------------------------------------
-# Main
+# Agent loop for one task
 # ---------------------------------------------------------------------------
 
-def main() -> None:
-    api_base = os.environ.get("API_BASE_URL", "https://api.openai.com/v1")
-    model = os.environ.get("MODEL_NAME", "gpt-4.1-mini")
-    hf_token = os.environ.get("HF_TOKEN")
-    if not hf_token:
-        raise RuntimeError("HF_TOKEN environment variable is required")
+def run_task(client: OpenAI, model: str, task_cfg: dict) -> float:
+    """Run a single task episode. Returns normalized score in [0, 1]."""
+    task_name = task_cfg["name"]
+    seed = task_cfg["seed"]
+    difficulty = task_cfg["difficulty"]
 
-    client = OpenAI(base_url=api_base, api_key=hf_token)
-
-    print("[START]", flush=True)
-    try:
-        total_score = 0.0
-        for ep_idx, ep_cfg in enumerate(EPISODES):
-            score = _run_episode(
-                client, model, ep_idx,
-                seed=ep_cfg["seed"],
-                difficulty=ep_cfg["difficulty"],
-            )
-            total_score += score
-
-        avg = total_score / max(len(EPISODES), 1)
-        print(f"[STEP] summary avg_score={avg:.1f}", flush=True)
-    finally:
-        print("[END]", flush=True)
-
-
-def _run_episode(
-    client: OpenAI,
-    model: str,
-    ep_idx: int,
-    seed: int,
-    difficulty: str,
-) -> float:
     env = IncidentRoomEnv()
     obs = env.reset(seed=seed, difficulty=difficulty)
     tools = env.get_tools()
+
+    log_start(task=task_name, env=BENCHMARK, model=model)
 
     messages: list[dict] = [
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": json.dumps(obs, default=str)},
     ]
 
+    step_num = 0
     done = False
-    step = 0
-    tick_info = obs["tick"]
+    rewards: List[float] = []
+    last_error: Optional[str] = None
 
-    while not done and step < MAX_TURNS:
-        response = client.chat.completions.create(
-            model=model,
-            messages=messages,
-            tools=tools,
-            tool_choice="auto",
-        )
-        msg = response.choices[0].message
-
-        # append assistant message
-        messages.append(_msg_to_dict(msg))
-
-        if not msg.tool_calls:
-            # model emitted reasoning text — continue
-            step += 1
-            continue
-
-        for tc in msg.tool_calls:
-            fn_name = tc.function.name
+    try:
+        while not done and step_num < MAX_TURNS:
             try:
-                fn_args = json.loads(tc.function.arguments)
-            except json.JSONDecodeError:
-                fn_args = {}
-
-            result = env.step(fn_name, fn_args)
-            tick_info = result["tick"]
-            done = result["done"]
-
-            print(
-                f"[STEP] ep={ep_idx} step={step} tool={fn_name} "
-                f"tick={tick_info['tick']} done={done}",
-                flush=True,
-            )
-
-            messages.append({
-                "role": "tool",
-                "tool_call_id": tc.id,
-                "content": json.dumps(result["tool_result"], default=str),
-            })
-
-            if done:
+                response = client.chat.completions.create(
+                    model=model,
+                    messages=messages,
+                    tools=tools,
+                    tool_choice="auto",
+                    temperature=TEMPERATURE,
+                )
+            except Exception as e:
+                last_error = str(e)
+                step_num += 1
+                rewards.append(0.0)
+                log_step(step=step_num, action="api_error", reward=0.0, done=False, error=last_error)
                 break
 
-        step += 1
+            msg = response.choices[0].message
+            messages.append(_msg_to_dict(msg))
 
-    score_info = env.grade()
-    print(
-        f"[STEP] ep={ep_idx} outcome={tick_info.get('outcome','?')} "
-        f"score={score_info['score']:.1f}/{score_info['max_score']} "
-        f"faults={score_info['faults_resolved']}/{score_info['faults_total']}",
-        flush=True,
-    )
-    return score_info["score"]
+            if not msg.tool_calls:
+                # Model emitted reasoning only — continue
+                step_num += 1
+                continue
+
+            for tc in msg.tool_calls:
+                fn_name = tc.function.name
+                try:
+                    fn_args = json.loads(tc.function.arguments)
+                except json.JSONDecodeError:
+                    fn_args = {}
+
+                result = env.step(fn_name, fn_args)
+                done = result["done"]
+                step_num += 1
+
+                # Compute reward: 0 for intermediate steps, normalized score on done
+                if done:
+                    grade_info = env.grade()
+                    reward = round(grade_info["score"] / 100.0, 2)
+                else:
+                    reward = 0.0
+
+                rewards.append(reward)
+                last_error = result["tool_result"].get("error")
+
+                # Format action string
+                args_str = ",".join(f"{k}={v}" for k, v in fn_args.items())
+                action_str = f"{fn_name}({args_str})"
+
+                log_step(
+                    step=step_num,
+                    action=action_str,
+                    reward=reward,
+                    done=done,
+                    error=last_error,
+                )
+
+                messages.append({
+                    "role": "tool",
+                    "tool_call_id": tc.id,
+                    "content": json.dumps(result["tool_result"], default=str),
+                })
+
+                if done:
+                    break
+
+        # Final grading
+        grade_info = env.grade()
+        score = round(grade_info["score"] / 100.0, 2)  # normalize to [0, 1]
+        success = grade_info["faults_resolved"] == grade_info["faults_total"]
+
+        # If we didn't get a done step, add the final reward
+        if not done:
+            rewards.append(score)
+            step_num += 1
+            log_step(
+                step=step_num,
+                action="timeout",
+                reward=score,
+                done=True,
+                error=None,
+            )
+
+    except Exception as e:
+        score = 0.0
+        success = False
+        if not rewards:
+            rewards = [0.0]
+        last_error = str(e)
+
+    finally:
+        log_end(success=success, steps=len(rewards), score=score, rewards=rewards)
+        env.close()
+
+    return score
 
 
 # ---------------------------------------------------------------------------
@@ -171,6 +224,20 @@ def _msg_to_dict(msg) -> dict:
             for tc in msg.tool_calls
         ]
     return d
+
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+
+def main() -> None:
+    if not HF_TOKEN:
+        raise RuntimeError("HF_TOKEN environment variable is required")
+
+    client = OpenAI(base_url=API_BASE_URL, api_key=HF_TOKEN)
+
+    for task_cfg in TASKS:
+        run_task(client, MODEL_NAME, task_cfg)
 
 
 if __name__ == "__main__":

@@ -105,6 +105,34 @@ class IncidentRoomEnv:
         assert self.world is not None
         return grade(self.world)
 
+    def state(self) -> dict:
+        """Return current observable state (OpenEnv spec)."""
+        if self.world is None:
+            return {"error": "no episode running"}
+        return {
+            "tick": self.world.tick,
+            "max_ticks": self.world.max_ticks,
+            "difficulty": self.world.difficulty,
+            "seed": self.world.seed,
+            "services": {
+                name: {
+                    "name": s.name, "kind": s.kind, "status": s.status,
+                    "health": round(health(s), 3),
+                    "error_rate": round(s.error_rate, 4),
+                    "latency_p99": round(s.latency_p99, 1),
+                    "cpu_pct": round(s.cpu_pct, 1),
+                    "memory_pct": round(s.memory_pct, 1),
+                }
+                for name, s in self.world.services.items()
+            },
+            "faults_total": len(self.world.active_faults),
+            "faults_resolved": sum(1 for f in self.world.active_faults if f.resolved),
+        }
+
+    def close(self) -> None:
+        """Clean up (OpenEnv spec)."""
+        self.world = None
+
     # ------------------------------------------------------------------
     # internal
     # ------------------------------------------------------------------

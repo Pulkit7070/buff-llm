@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "incidentroom"
+version = "2.0.0"
+description = "Tick-based SRE incident-response simulator for the Meta OpenEnv hackathon"
+requires-python = ">=3.10"
+dependencies = [
+    "openai>=1.0",
+    "fastapi>=0.100",
+    "uvicorn>=0.20",
+    "pyyaml>=6.0",
+    "openenv-core>=0.2.0",
+]
+
+[project.scripts]
+incidentroom-inference = "inference:main"
+server = "webapp:app"

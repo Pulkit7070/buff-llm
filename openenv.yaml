@@ -1,0 +1,55 @@
+name: incidentroom
+version: "2.0"
+description: >
+  Tick-based SRE incident-response simulator. Agents diagnose and remediate
+  infrastructure faults across microservices under a tick budget. The environment
+  is fully deterministic, grading is a pure function over world state, and wrong
+  actions inject new faults (the world gets worse, not just a penalty).
+
+author: IncidentRoom Team
+license: MIT
+
+env_class: server.env:IncidentRoomEnv
+
+tasks:
+  - name: sre-incident-easy
+    description: "3 services, 1 fault, 15-tick budget. Single root cause."
+    difficulty: easy
+    seed: 42
+    max_steps: 40
+
+  - name: sre-incident-medium
+    description: "6 services, 1 fault + 2 red herrings, 20-tick budget."
+    difficulty: medium
+    seed: 137
+    max_steps: 40
+
+  - name: sre-incident-hard
+    description: "8 services, 2 faults + 2 red herrings, 25-tick budget."
+    difficulty: hard
+    seed: 256
+    max_steps: 40
+
+action_space:
+  type: function_call
+  description: >
+    13 tools (5 read + 8 action). Each tool call costs one tick.
+    Read tools: list_services, get_metrics, get_logs, get_topology, get_recent_changes.
+    Action tools: restart_pod, rollback, scale_up, toggle_feature_flag,
+    enable_circuit_breaker, drain_region, kill_long_queries, rotate_cert.
+
+observation_space:
+  type: dict
+  fields:
+    - tool_result: "dict — result of the last tool call"
+    - tick: "dict — {tick, done, outcome}"
+    - done: "bool — whether the episode has ended"
+    - services_summary: "list[dict] — name, status, health for each service"
+
+scoring:
+  range: [0.0, 1.0]
+  components:
+    fault_resolution: 0.40
+    service_health: 0.25
+    user_impact: 0.20
+    time_efficiency: 0.15
