@@ -12,6 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 
 from server.env import IncidentRoomEnv
+from server.tools import TOOL_HANDLERS
 from server.world import health
 from llm_agent import (
     run_llm_agent, run_llm_agent_streaming, run_hitl_agent,
@@ -35,11 +36,19 @@ async def index():
 
 # ── Manual / basic endpoints ──────────────────────────────────────────
 
+VALID_DIFFICULTIES = ("easy", "medium", "hard")
+
+
 @app.post("/api/reset")
 async def reset(req: Request):
     body = await req.json()
-    seed = int(body.get("seed", 42))
+    try:
+        seed = int(body.get("seed", 42))
+    except (TypeError, ValueError):
+        return JSONResponse({"error": "seed must be an integer"}, status_code=400)
     difficulty = body.get("difficulty", "easy")
+    if difficulty not in VALID_DIFFICULTIES:
+        return JSONResponse({"error": f"difficulty must be one of {VALID_DIFFICULTIES}"}, status_code=400)
     scenario_id = body.get("scenario_id")
     if scenario_id:
         sc = db.get_scenario(scenario_id)
@@ -57,7 +66,12 @@ async def reset(req: Request):
 @app.post("/api/step")
 async def step(req: Request):
     body = await req.json()
-    obs = env.step(body["tool_name"], body.get("args", {}))
+    tool_name = body.get("tool_name")
+    if not tool_name:
+        return JSONResponse({"error": "tool_name is required"}, status_code=400)
+    if tool_name not in TOOL_HANDLERS:
+        return JSONResponse({"error": f"unknown tool '{tool_name}'"}, status_code=400)
+    obs = env.step(tool_name, body.get("args", {}))
     return _enrich(obs)
 
 
@@ -89,8 +103,13 @@ async def openenv_reset(req: Request):
         body = await req.json()
     except Exception:
         body = {}
-    seed = int(body.get("seed", 42))
+    try:
+        seed = int(body.get("seed", 42))
+    except (TypeError, ValueError):
+        return JSONResponse({"error": "seed must be an integer"}, status_code=400)
     difficulty = body.get("difficulty", "easy")
+    if difficulty not in VALID_DIFFICULTIES:
+        return JSONResponse({"error": f"difficulty must be one of {VALID_DIFFICULTIES}"}, status_code=400)
     obs = env.reset(seed=seed, difficulty=difficulty)
     return _enrich(obs)
 
@@ -343,8 +362,16 @@ async def arena_llm(req: Request):
 
         model_a_name = cfg_a.get("model", "model-a")
         model_b_name = cfg_b.get("model", "model-b")
-        sa = grade_a["score"] if grade_a else 0
-        sb = grade_b["score"] if grade_b else 0
+        try:
+            sa = grade_a["score"] if grade_a else 0
+            sb = grade_b["score"] if grade_b else 0
+        except (TypeError, KeyError):
+            sa = 0
+            sb = 0
+        if grade_a is None:
+            grade_a = {"score": 0}
+        if grade_b is None:
+            grade_b = {"score": 0}
 
         elo = db.update_elo(model_a_name, model_b_name, sa, sb)
 
@@ -405,6 +432,10 @@ async def arena_prompt_ab(req: Request):
 
         await task_a
         await task_b
+        if grade_a is None:
+            grade_a = {"score": 0}
+        if grade_b is None:
+            grade_b = {"score": 0}
         yield _sse("arena_done", {"grade_a": grade_a, "grade_b": grade_b,
                                    "model": model, "prompt_a_hash": hashlib.sha256(prompt_a.encode()).hexdigest()[:8],
                                    "prompt_b_hash": hashlib.sha256(prompt_b.encode()).hexdigest()[:8]})

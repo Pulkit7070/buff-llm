@@ -2,3 +2,7 @@ __pycache__/
 *.pyc
 .env
 .claude/
+*.db
+incidentroom.db
+dist/
+*.egg-info/

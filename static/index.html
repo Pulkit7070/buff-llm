@@ -271,6 +271,37 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 /* Leaderboard ELO bar */
 .elo-bar{width:60px;height:4px;background:rgba(255,255,255,.04);border-radius:2px;overflow:hidden;display:inline-block;vertical-align:middle;margin-left:6px}
 .elo-fill{height:100%;border-radius:2px;background:var(--accent)}
+
+/* HITL Edit Modal */
+.hitl-edit-tool-sel{width:100%;background:var(--surface);border:1px solid var(--border);color:var(--t1);padding:7px 10px;border-radius:6px;font:400 11px 'JetBrains Mono',monospace;outline:none;transition:border-color .15s;cursor:pointer}
+.hitl-edit-tool-sel:focus{border-color:var(--accent)}
+.hitl-edit-tool-sel option{background:var(--panel);color:var(--t1)}
+#hitlEditParams .field{margin-bottom:10px}
+.hitl-modal-foot{padding:12px 18px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:6px}
+.hitl-modal-foot .btn{padding:7px 20px}
+.btn-approve{background:var(--green);color:#fff}
+.btn-reject{background:rgba(239,68,68,.15);color:var(--red);border:1px solid rgba(239,68,68,.2)}
+.btn-edit-confirm{background:rgba(234,179,8,.12);color:var(--yellow);border:1px solid rgba(234,179,8,.2)}
+
+/* Retry button on error entries */
+.fe-retry{display:inline-block;margin-top:6px;padding:3px 10px;border-radius:4px;border:1px solid rgba(59,130,246,.3);background:rgba(59,130,246,.08);color:var(--accent);font:600 9px 'JetBrains Mono',monospace;cursor:pointer;text-transform:uppercase;letter-spacing:.3px;transition:all .15s}
+.fe-retry:hover{background:rgba(59,130,246,.15);border-color:rgba(59,130,246,.5)}
+.fe-countdown{display:inline-block;margin-left:8px;font:500 9px 'JetBrains Mono',monospace;color:var(--yellow)}
+
+/* Status text label next to dot */
+.dot-label{font:600 8px 'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.3px}
+
+/* Focus-visible outlines for accessibility */
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,.btn:focus-visible,.btn-icon:focus-visible,.hitl-btn:focus-visible,.sel:focus-visible,.seed-input:focus-visible,.mt-b:focus-visible,.sc-close:focus-visible,.fe-retry:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* Responsive design */
+@media (max-width: 900px) {
+  .main { grid-template-columns: 1fr !important }
+  .right { border-left: none; border-top: 1px solid var(--border) }
+  .arena-wrap { grid-template-columns: 1fr }
+  .hdr { flex-wrap: wrap; gap: 6px }
+  .modal { width: 95vw }
+}
 </style>
 </head>
 <body>
@@ -308,15 +339,15 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
     <button class="btn btn-run" id="btnRun">RUN</button>
     <button class="btn btn-stop" id="btnStop">STOP</button>
     <span class="nav-sep"></span>
-    <button class="btn-icon" id="btnLeaderboard" title="Leaderboard">&#9733;</button>
-    <button class="btn-icon" id="btnHistory" title="History">&#9776;</button>
-    <button class="btn-icon" id="btnScenarios" title="Scenarios">&#9874;</button>
-    <button class="btn-icon" id="btnSettings" title="Settings">&#9881;</button>
-    <button class="btn-icon" id="btnMute" title="Sound">&#x1f50a;</button>
+    <button class="btn-icon" id="btnLeaderboard" title="Leaderboard" aria-label="Leaderboard">&#9733;</button>
+    <button class="btn-icon" id="btnHistory" title="History" aria-label="History">&#9776;</button>
+    <button class="btn-icon" id="btnScenarios" title="Scenarios" aria-label="Scenarios">&#9874;</button>
+    <button class="btn-icon" id="btnSettings" title="Settings" aria-label="Settings">&#9881;</button>
+    <button class="btn-icon" id="btnMute" title="Sound" aria-label="Toggle sound">&#x1f50a;</button>
   </div>
 </header>
 
-<div class="strip" id="strip">
+<div class="strip" id="strip" role="status">
   <div class="lbl">TICK <span class="val" id="st-tick">0/20</span></div>
   <div class="pbar"><div class="pfill" id="pfill"></div></div>
   <div class="lbl">FAULTS <span class="val" id="st-faults">0/0</span></div>
@@ -364,7 +395,7 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
       <button class="mt-b act" data-t="kill_long_queries" data-p="service">kill_long_queries(svc)</button>
       <button class="mt-b act" data-t="rotate_cert" data-p="service_a,service_b">rotate_cert(a, b)</button>
     </div>
-    <div class="feed" id="feed">
+    <div class="feed" id="feed" role="log" aria-live="polite">
       <div class="empty" id="feedEmpty">
         <p style="color:var(--t3);font:500 10px 'JetBrains Mono',monospace">&gt; awaiting initialization...</p>
       </div>
@@ -375,7 +406,7 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 <!-- Settings Modal -->
 <div class="modal-ov" id="settingsModal">
   <div class="modal">
-    <div class="modal-hdr"><h3>LLM Settings</h3><button class="modal-close" onclick="closeModal('settingsModal')">&times;</button></div>
+    <div class="modal-hdr"><h3>LLM Settings</h3><button class="modal-close" onclick="closeModal('settingsModal')" aria-label="Close">&times;</button></div>
     <div class="modal-body">
       <div class="field"><label>API Base URL</label><input type="text" id="cfgBaseUrl" placeholder="https://api.openai.com/v1"><div class="hint">OpenAI-compatible endpoint</div></div>
       <div class="field"><label>API Key</label><div class="field-row"><input type="password" id="cfgApiKey" placeholder="sk-..."><button class="btn-icon" id="btnEye" title="Toggle visibility">SHOW</button></div><div class="hint">Never sent to our server — goes directly to the API</div></div>
@@ -389,7 +420,7 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 <!-- Leaderboard Modal -->
 <div class="modal-ov" id="leaderboardModal">
   <div class="modal">
-    <div class="modal-hdr"><h3>ELO Leaderboard</h3><button class="modal-close" onclick="closeModal('leaderboardModal')">&times;</button></div>
+    <div class="modal-hdr"><h3>ELO Leaderboard</h3><button class="modal-close" onclick="closeModal('leaderboardModal')" aria-label="Close">&times;</button></div>
     <div class="modal-body" id="leaderboardBody"><p style="color:var(--t3)">Loading...</p></div>
   </div>
 </div>
@@ -397,7 +428,7 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 <!-- History Modal -->
 <div class="modal-ov" id="historyModal">
   <div class="modal wide">
-    <div class="modal-hdr"><h3>Run History</h3><button class="modal-close" onclick="closeModal('historyModal')">&times;</button></div>
+    <div class="modal-hdr"><h3>Run History</h3><button class="modal-close" onclick="closeModal('historyModal')" aria-label="Close">&times;</button></div>
     <div class="modal-body" id="historyBody"><p style="color:var(--t3)">Loading...</p></div>
   </div>
 </div>
@@ -405,7 +436,7 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 <!-- Run Detail Modal -->
 <div class="modal-ov" id="runDetailModal">
   <div class="modal wide">
-    <div class="modal-hdr"><h3>Run Detail</h3><button class="modal-close" onclick="closeModal('runDetailModal')">&times;</button></div>
+    <div class="modal-hdr"><h3>Run Detail</h3><button class="modal-close" onclick="closeModal('runDetailModal')" aria-label="Close">&times;</button></div>
     <div class="modal-body" id="runDetailBody"></div>
   </div>
 </div>
@@ -413,7 +444,7 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 <!-- Scenarios Modal -->
 <div class="modal-ov" id="scenariosModal">
   <div class="modal wide">
-    <div class="modal-hdr"><h3>Custom Scenarios</h3><button class="modal-close" onclick="closeModal('scenariosModal')">&times;</button></div>
+    <div class="modal-hdr"><h3>Custom Scenarios</h3><button class="modal-close" onclick="closeModal('scenariosModal')" aria-label="Close">&times;</button></div>
     <div class="modal-body" id="scenariosBody"><p style="color:var(--t3)">Loading...</p></div>
     <div class="modal-foot"><button class="btn btn-save" onclick="showNewScenario()">NEW SCENARIO</button></div>
   </div>
@@ -422,7 +453,7 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 <!-- New Scenario Modal -->
 <div class="modal-ov" id="newScenarioModal">
   <div class="modal wide">
-    <div class="modal-hdr"><h3>Create Scenario</h3><button class="modal-close" onclick="closeModal('newScenarioModal')">&times;</button></div>
+    <div class="modal-hdr"><h3>Create Scenario</h3><button class="modal-close" onclick="closeModal('newScenarioModal')" aria-label="Close">&times;</button></div>
     <div class="modal-body">
       <div class="field"><label>Name</label><input type="text" id="scnName" placeholder="Redis Cache Storm"></div>
       <div class="field"><label>Description</label><input type="text" id="scnDesc" placeholder="Cache eviction cascading to API"></div>
@@ -435,7 +466,7 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 <!-- LLM Arena Config Modal -->
 <div class="modal-ov" id="arenaConfigModal">
   <div class="modal wide">
-    <div class="modal-hdr"><h3>LLM Arena Config</h3><button class="modal-close" onclick="closeModal('arenaConfigModal')">&times;</button></div>
+    <div class="modal-hdr"><h3>LLM Arena Config</h3><button class="modal-close" onclick="closeModal('arenaConfigModal')" aria-label="Close">&times;</button></div>
     <div class="modal-body">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
         <div>
@@ -461,7 +492,7 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 <!-- Prompt A/B Config Modal -->
 <div class="modal-ov" id="promptABModal">
   <div class="modal wide">
-    <div class="modal-hdr"><h3>Prompt A/B Test</h3><button class="modal-close" onclick="closeModal('promptABModal')">&times;</button></div>
+    <div class="modal-hdr"><h3>Prompt A/B Test</h3><button class="modal-close" onclick="closeModal('promptABModal')" aria-label="Close">&times;</button></div>
     <div class="modal-body">
       <div class="field"><label>Same model + API key from Settings will be used</label></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
@@ -479,10 +510,43 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
   </div>
 </div>
 
+<!-- HITL Edit Modal -->
+<div class="modal-ov" id="hitlEditModal">
+  <div class="modal">
+    <div class="modal-hdr"><h3>Edit Proposed Action</h3><button class="modal-close" onclick="closeModal('hitlEditModal')" aria-label="Close">&times;</button></div>
+    <div class="modal-body">
+      <div class="field">
+        <label>Tool</label>
+        <select class="hitl-edit-tool-sel" id="hitlEditTool" onchange="hitlEditToolChanged()">
+          <option value="list_services">list_services</option>
+          <option value="get_metrics">get_metrics</option>
+          <option value="get_logs">get_logs</option>
+          <option value="get_topology">get_topology</option>
+          <option value="get_recent_changes">get_recent_changes</option>
+          <option value="restart_pod">restart_pod</option>
+          <option value="rollback">rollback</option>
+          <option value="scale_up">scale_up</option>
+          <option value="toggle_feature_flag">toggle_feature_flag</option>
+          <option value="enable_circuit_breaker">enable_circuit_breaker</option>
+          <option value="drain_region">drain_region</option>
+          <option value="kill_long_queries">kill_long_queries</option>
+          <option value="rotate_cert">rotate_cert</option>
+        </select>
+      </div>
+      <div id="hitlEditParams"></div>
+    </div>
+    <div class="hitl-modal-foot">
+      <button class="btn btn-reject" id="hitlEditRejectBtn" onclick="hitlEditAction('reject')">REJECT</button>
+      <button class="btn btn-approve" id="hitlEditApproveBtn" onclick="hitlEditAction('approve')">APPROVE ORIGINAL</button>
+      <button class="btn btn-edit-confirm" id="hitlEditConfirmBtn" onclick="hitlEditAction('edit')">SUBMIT EDIT</button>
+    </div>
+  </div>
+</div>
+
 <!-- Batch Config Modal -->
 <div class="modal-ov" id="batchConfigModal">
   <div class="modal">
-    <div class="modal-hdr"><h3>Batch Evaluation</h3><button class="modal-close" onclick="closeModal('batchConfigModal')">&times;</button></div>
+    <div class="modal-hdr"><h3>Batch Evaluation</h3><button class="modal-close" onclick="closeModal('batchConfigModal')" aria-label="Close">&times;</button></div>
     <div class="modal-body">
       <div class="field"><label>Uses model + API key from Settings</label></div>
       <div class="field"><label>Seeds (comma-separated)</label><input type="text" id="batchSeeds" value="42, 137, 256, 7, 1024"></div>
@@ -556,17 +620,41 @@ async function api(url,body){const opts=body!==undefined?{method:'POST',headers:
 function getSeed(){return parseInt($('#seed').value)||42}
 function getDiff(){return $('#diff').value}
 
-/* fetchSSE — POST SSE via fetch+ReadableStream */
+/* fetchSSE — POST SSE via fetch+ReadableStream with 30s timeout */
 async function fetchSSE(url,body,handler,signal){
-  const resp=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal});
-  if(!resp.ok){const err=await resp.json().catch(()=>({error:resp.statusText}));throw new Error(err.error||resp.statusText)}
-  const reader=resp.body.getReader(),decoder=new TextDecoder();let buf='';
-  while(true){
-    const{done,value}=await reader.read();if(done)break;
-    buf+=decoder.decode(value,{stream:true});
-    const frames=buf.split('\n\n');buf=frames.pop();
-    for(const frame of frames){let ev=null,data=null;for(const line of frame.split('\n')){if(line.startsWith('event: '))ev=line.slice(7);else if(line.startsWith('data: '))data=line.slice(6)}
-      if(ev&&data)handler(ev,JSON.parse(data))}
+  const timeoutCtrl=new AbortController();
+  const timeoutId=setTimeout(()=>timeoutCtrl.abort(),30000);
+  // If caller provided a signal, listen to both
+  let onExternalAbort;
+  if(signal){
+    onExternalAbort=()=>timeoutCtrl.abort();
+    signal.addEventListener('abort',onExternalAbort);
+  }
+  try{
+    const resp=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:timeoutCtrl.signal});
+    clearTimeout(timeoutId);
+    if(!resp.ok){
+      const err=await resp.json().catch(()=>({error:resp.statusText}));
+      const status=resp.status;
+      if(status===401||status===403)throw Object.assign(new Error(err.error||'Authentication failed — check your API key in Settings'),{status});
+      if(status===429)throw Object.assign(new Error(err.error||'Rate limited'),{status});
+      throw Object.assign(new Error(err.error||resp.statusText),{status});
+    }
+    const reader=resp.body.getReader(),decoder=new TextDecoder();let buf='';
+    // Reset timeout for streaming — each chunk resets a 30s idle timer
+    let idleTimer=setTimeout(()=>timeoutCtrl.abort(),30000);
+    while(true){
+      const{done,value}=await reader.read();if(done)break;
+      clearTimeout(idleTimer);idleTimer=setTimeout(()=>timeoutCtrl.abort(),30000);
+      buf+=decoder.decode(value,{stream:true});
+      const frames=buf.split('\n\n');buf=frames.pop();
+      for(const frame of frames){let ev=null,data=null;for(const line of frame.split('\n')){if(line.startsWith('event: '))ev=line.slice(7);else if(line.startsWith('data: '))data=line.slice(6)}
+        if(ev&&data)handler(ev,JSON.parse(data))}
+    }
+    clearTimeout(idleTimer);
+  }finally{
+    clearTimeout(timeoutId);
+    if(signal&&onExternalAbort)signal.removeEventListener('abort',onExternalAbort);
   }
 }
 
@@ -628,7 +716,7 @@ function restoreRight(){
     <button class="mt-b act" data-t="drain_region" data-p="region">drain_region(region)</button>
     <button class="mt-b act" data-t="kill_long_queries" data-p="service">kill_long_queries(svc)</button>
     <button class="mt-b act" data-t="rotate_cert" data-p="service_a,service_b">rotate_cert(a, b)</button></div>
-    <div class="feed" id="feed"><div class="empty" id="feedEmpty"><p style="color:var(--t3);font:500 10px 'JetBrains Mono',monospace">&gt; awaiting initialization...</p></div></div>`;
+    <div class="feed" id="feed" role="log" aria-live="polite"><div class="empty" id="feedEmpty"><p style="color:var(--t3);font:500 10px 'JetBrains Mono',monospace">&gt; awaiting initialization...</p></div></div>`;
 }
 
 /* ═══ Rule-Based ═══ */
@@ -649,7 +737,7 @@ function attachRuleHandlers(src){
     const o=d.outcome||d.grade&&'done';setAst('done',o==='success'?'Resolved':o);
     addDoneEntry(o,d.grade);o==='success'?sndWin():sndFail();showScore(d.grade,o);
   });
-  src.onerror=()=>{finishRun();setAst('idle','Error')};
+  src.onerror=()=>{finishRun();setAst('idle','Error');addErrorEntry('Connection lost to server')};
 }
 
 /* ═══ LLM Agent (standard) ═══ */
@@ -657,7 +745,7 @@ async function runLLM(){
   const s=loadSettings();if(!s.apiKey){openSettings();return}
   prepareRun('LLM Agent');abortCtrl=new AbortController();
   try{await fetchSSE('/api/llm-agent/run',{seed:getSeed(),difficulty:getDiff(),api_key:s.apiKey,api_base_url:s.baseUrl,model:s.model,system_prompt:s.systemPrompt||undefined},handleLLMEvent,abortCtrl.signal)}
-  catch(e){if(e.name!=='AbortError')addErrorEntry('Connection failed: '+e.message)}
+  catch(e){if(e.name!=='AbortError')addErrorEntry('Connection failed: '+e.message,e)}
   finishRun();
 }
 
@@ -679,7 +767,7 @@ async function runLLMStream(){
   const s=loadSettings();if(!s.apiKey){openSettings();return}
   prepareRun('LLM Streaming');abortCtrl=new AbortController();streamingEl=null;
   try{await fetchSSE('/api/llm-agent/stream',{seed:getSeed(),difficulty:getDiff(),api_key:s.apiKey,api_base_url:s.baseUrl,model:s.model,system_prompt:s.systemPrompt||undefined},handleStreamEvent,abortCtrl.signal)}
-  catch(e){if(e.name!=='AbortError')addErrorEntry('Connection failed: '+e.message)}
+  catch(e){if(e.name!=='AbortError')addErrorEntry('Connection failed: '+e.message,e)}
   finishRun();
 }
 
@@ -719,7 +807,7 @@ async function runHITL(){
   const s=loadSettings();if(!s.apiKey){openSettings();return}
   prepareRun('Human-in-the-Loop');abortCtrl=new AbortController();
   try{await fetchSSE('/api/hitl/run',{seed:getSeed(),difficulty:getDiff(),api_key:s.apiKey,api_base_url:s.baseUrl,model:s.model,system_prompt:s.systemPrompt||undefined},handleHITLEvent,abortCtrl.signal)}
-  catch(e){if(e.name!=='AbortError')addErrorEntry('Connection failed: '+e.message)}
+  catch(e){if(e.name!=='AbortError')addErrorEntry('Connection failed: '+e.message,e)}
   finishRun();
 }
 
@@ -764,11 +852,73 @@ async function hitlRespond(action,tool,argsJson){
   cards.forEach(c=>c.style.opacity='.4');
 }
 
+/* HITL Edit Modal — tool parameter schemas */
+const HITL_TOOL_PARAMS={
+  list_services:[],
+  get_metrics:[{name:'service',type:'string',required:true}],
+  get_logs:[{name:'service',type:'string',required:true},{name:'n',type:'integer',required:false}],
+  get_topology:[],
+  get_recent_changes:[{name:'service',type:'string',required:true}],
+  restart_pod:[{name:'service',type:'string',required:true}],
+  rollback:[{name:'service',type:'string',required:true}],
+  scale_up:[{name:'service',type:'string',required:true}],
+  toggle_feature_flag:[{name:'service',type:'string',required:true},{name:'flag_name',type:'string',required:true}],
+  enable_circuit_breaker:[{name:'service',type:'string',required:true}],
+  drain_region:[{name:'region',type:'string',required:true}],
+  kill_long_queries:[{name:'service',type:'string',required:true}],
+  rotate_cert:[{name:'service_a',type:'string',required:true},{name:'service_b',type:'string',required:true}]
+};
+let _hitlOrigTool=null,_hitlOrigArgs=null;
+
 function hitlEditPrompt(tool,argsJson){
   let args={};try{args=JSON.parse(argsJson)}catch(e){}
-  const newTool=prompt('Tool name:',tool);
-  const newArgs=prompt('Args (JSON):',JSON.stringify(args));
-  if(newTool&&newArgs){try{hitlRespond('edit',newTool,newArgs)}catch(e){hitlRespond('approve',tool,argsJson)}}
+  _hitlOrigTool=tool;_hitlOrigArgs=argsJson;
+  $('#hitlEditTool').value=tool;
+  hitlEditRenderParams(tool,args);
+  openModal('hitlEditModal');
+}
+
+function hitlEditToolChanged(){
+  const tool=$('#hitlEditTool').value;
+  hitlEditRenderParams(tool,{});
+}
+
+function hitlEditRenderParams(tool,args){
+  const container=$('#hitlEditParams');
+  const params=HITL_TOOL_PARAMS[tool]||[];
+  if(!params.length){container.innerHTML='<div style="color:var(--t3);font:400 11px \'JetBrains Mono\',monospace;padding:6px 0">No parameters required</div>';return}
+  let h='';
+  const svcNames=ST?Object.keys(ST.services):[];
+  params.forEach(p=>{
+    const val=args[p.name]||'';
+    h+=`<div class="field"><label>${p.name}${p.required?' *':''}</label>`;
+    if((p.name==='service'||p.name==='service_a'||p.name==='service_b')&&svcNames.length){
+      h+=`<select class="hitl-edit-tool-sel" id="hitl-p-${p.name}">`;
+      svcNames.forEach(s=>{h+=`<option value="${esc(s)}"${s===val?' selected':''}>${esc(s)}</option>`});
+      h+=`</select>`;
+    } else if(p.type==='integer'){
+      h+=`<input type="number" id="hitl-p-${p.name}" value="${val!==''?val:''}" placeholder="${p.name}">`;
+    } else {
+      h+=`<input type="text" id="hitl-p-${p.name}" value="${esc(String(val))}" placeholder="${p.name}">`;
+    }
+    h+=`</div>`;
+  });
+  container.innerHTML=h;
+}
+
+function hitlEditAction(action){
+  if(action==='reject'){hitlRespond('reject');closeModal('hitlEditModal');return}
+  if(action==='approve'){hitlRespond('approve',_hitlOrigTool,_hitlOrigArgs);closeModal('hitlEditModal');return}
+  // edit — gather values from modal
+  const tool=$('#hitlEditTool').value;
+  const params=HITL_TOOL_PARAMS[tool]||[];
+  const args={};
+  params.forEach(p=>{
+    const el=document.getElementById('hitl-p-'+p.name);
+    if(el&&el.value.trim()){args[p.name]=p.type==='integer'?parseInt(el.value):el.value.trim()}
+  });
+  hitlRespond('edit',tool,JSON.stringify(args));
+  closeModal('hitlEditModal');
 }
 
 /* ═══ Arena (Rule vs Naive) ═══ */
@@ -828,7 +978,7 @@ async function startLLMArena(){
     model_b:{api_key:keyB,api_base_url:$('#arB_base').value.trim()||'https://api.openai.com/v1',model:modelB,system_prompt:$('#arB_prompt').value.trim()||undefined},
     seed:getSeed(),difficulty:getDiff()
   },handleLLMArenaEvent,abortCtrl.signal)}
-  catch(e){if(e.name!=='AbortError')addErrorEntry('Arena failed: '+e.message)}
+  catch(e){if(e.name!=='AbortError')addErrorEntry('Arena failed: '+e.message,e)}
   finishRun();
 }
 
@@ -877,7 +1027,7 @@ async function startPromptAB(){
     prompt_a:$('#abA_prompt').value.trim()||DEFAULT_PROMPT,
     prompt_b:$('#abB_prompt').value.trim()||DEFAULT_PROMPT
   },handleLLMArenaEvent,abortCtrl.signal)}
-  catch(e){if(e.name!=='AbortError')addErrorEntry('Prompt A/B failed: '+e.message)}
+  catch(e){if(e.name!=='AbortError')addErrorEntry('Prompt A/B failed: '+e.message,e)}
   finishRun();
 }
 
@@ -900,7 +1050,7 @@ async function startBatch(){
     api_key:s.apiKey,api_base_url:s.baseUrl,model:s.model,system_prompt:s.systemPrompt||undefined,
     seeds,difficulties:diffs
   },handleBatchEvent,abortCtrl.signal)}
-  catch(e){if(e.name!=='AbortError')addErrorEntry('Batch failed: '+e.message)}
+  catch(e){if(e.name!=='AbortError')addErrorEntry('Batch failed: '+e.message,e)}
   finishRun();
 }
 
@@ -976,7 +1126,25 @@ function addStepTool(stepNum,tool,args,result,meta,tick){
   if(tick){const te=card.querySelector('.step-tick');if(te)te.textContent=`Tick ${tick.tick}`}scrollFeed();
 }
 function addResultToStep(stepNum,result){const feed=$('#feed');if(!feed)return;const cards=feed.querySelectorAll('.step-card');let card=null;for(const c of cards)if(c.dataset.step==stepNum){card=c;break}if(!card)return;const body=card.querySelector('.step-body');const det=document.createElement('details');det.className='step-section';det.innerHTML=`<summary><span class="tag tag-result">RESULT</span></summary><div class="section-content mono">${formatResult(result)}</div>`;body.appendChild(det);scrollFeed()}
-function addErrorEntry(text){const feed=$('#feed');if(!feed)return;const d=document.createElement('div');d.className='fe error';d.innerHTML=`<span class="fe-tag tag-error">ERROR</span><div class="fe-text">${esc(text)}</div>`;feed.appendChild(d);feed.scrollTop=feed.scrollHeight}
+function addErrorEntry(text,errObj){
+  const feed=$('#feed');if(!feed)return;
+  const d=document.createElement('div');d.className='fe error';
+  let extra='';
+  const status=errObj&&errObj.status;
+  if(status===401||status===403||/auth|api.?key|unauthorized|forbidden/i.test(text)){
+    extra=`<div style="margin-top:4px;font:400 10px 'JetBrains Mono',monospace;color:var(--yellow)">Check your API key and base URL in Settings (G).</div>`;
+  } else if(status===429||/rate.?limit|too many requests/i.test(text)){
+    extra=`<div style="margin-top:4px"><span class="fe-countdown" id="rl-cd">Retrying in 10s...</span></div>`;
+    setTimeout(()=>{const cd=document.getElementById('rl-cd');if(cd)cd.textContent='Retrying...';if(!running)$('#btnRun').click()},10000);
+    let sec=10;const iv=setInterval(()=>{sec--;const cd=document.getElementById('rl-cd');if(!cd){clearInterval(iv);return}if(sec>0)cd.textContent=`Retrying in ${sec}s...`;else{cd.textContent='Retrying...';clearInterval(iv)}},1000);
+  } else if(/network|fetch|failed to fetch|connection|timeout|aborted/i.test(text)){
+    extra=`<div style="margin-top:4px"><button class="fe-retry" onclick="this.parentElement.parentElement.parentElement.remove();$('#btnRun').click()">Reconnect</button></div>`;
+  } else {
+    extra=`<div style="margin-top:4px"><button class="fe-retry" onclick="this.parentElement.parentElement.parentElement.remove();$('#btnRun').click()">Retry</button></div>`;
+  }
+  d.innerHTML=`<span class="fe-tag tag-error">ERROR</span><div class="fe-text">${esc(text)}${extra}</div>`;
+  feed.appendChild(d);feed.scrollTop=feed.scrollHeight;
+}
 function addDoneEntry(outcome,grade){const feed=$('#feed');if(!feed)return;const d=document.createElement('div');d.className='fe done';d.innerHTML=`<span class="fe-tag tag-done">COMPLETE</span><div class="fe-text">${(outcome||'').toUpperCase()} \u2014 Score: ${grade.score.toFixed(1)}/100</div>`;feed.appendChild(d);feed.scrollTop=feed.scrollHeight}
 function addInfoEntry(text){const feed=$('#feed');if(!feed)return;const d=document.createElement('div');d.className='fe info';d.innerHTML=`<span class="fe-tag tag-tool">INFO</span><div class="fe-text">${esc(text)}</div>`;feed.appendChild(d);feed.scrollTop=feed.scrollHeight}
 function scrollFeed(){const feed=$('#feed');if(feed)feed.scrollTop=feed.scrollHeight}
@@ -1004,7 +1172,7 @@ function renderCards(st){
       spark=`<div class="spark"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><path d="${area}" class="spark-area" fill="${hc}"/><path d="${line}" class="spark-line" stroke="${hc}"/></svg></div>`}
     const d=document.createElement('div');d.className=`card st-${s.status}`;d.id=`svc-${s.name}`;
     d.innerHTML=`<div class="card-top"><span class="card-name">${s.name}</span><span class="pill pill-${s.kind}">${s.kind}</span></div>
-      <div class="card-status"><div class="card-st-left"><div class="dot dot-${s.status}"></div><span class="card-st-txt" style="color:${hc}">${s.status}${s.restart_cooldown?' (restarting)':''}</span></div><span class="card-hp" style="color:${hc}">${hp}%</span></div>
+      <div class="card-status"><div class="card-st-left"><div class="dot dot-${s.status}" aria-hidden="true"></div><span class="dot-label" style="color:${hc}">${s.status}</span><span class="card-st-txt" style="color:${hc}">${s.restart_cooldown?' (restarting)':''}</span></div><span class="card-hp" style="color:${hc}">${hp}%</span></div>
       <div class="mets"><div class="met"><span class="met-l">err</span><span class="met-v ${mc(s.error_rate,.05,.2)}">${s.error_rate.toFixed(4)}</span></div><div class="met"><span class="met-l">lat</span><span class="met-v ${mc(s.latency_p99,150,500)}">${s.latency_p99.toFixed(0)}ms</span></div><div class="met"><span class="met-l">cpu</span><span class="met-v ${mc(s.cpu_pct,70,90)}">${s.cpu_pct.toFixed(1)}%</span></div><div class="met"><span class="met-l">mem</span><span class="met-v ${mc(s.memory_pct,75,90)}">${s.memory_pct.toFixed(1)}%</span></div></div>${spark}<div class="hbar"><div class="hfill" style="width:${hp}%;background:${hc}"></div></div>`;
     g.appendChild(d);
   });

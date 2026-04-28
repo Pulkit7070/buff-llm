@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import time
 from typing import List, Optional
 
 from openai import OpenAI
@@ -29,6 +30,9 @@ HF_TOKEN = os.getenv("HF_TOKEN") or os.getenv("API_KEY")
 BENCHMARK = "incidentroom"
 MAX_TURNS = 40
 TEMPERATURE = 0.7
+MAX_RETRIES = 3
+RETRY_BACKOFF = [1, 2, 4]  # seconds
+RETRYABLE_STATUS_CODES = {429, 500, 502, 503}
 
 SYSTEM_PROMPT = """\
 You are an expert SRE responding to a live incident in a microservice system.
@@ -106,16 +110,25 @@ def run_task(client: OpenAI, model: str, task_cfg: dict) -> float:
 
     try:
         while not done and step_num < MAX_TURNS:
-            try:
-                response = client.chat.completions.create(
-                    model=model,
-                    messages=messages,
-                    tools=tools,
-                    tool_choice="auto",
-                    temperature=TEMPERATURE,
-                )
-            except Exception as e:
-                last_error = str(e)
+            response = None
+            for attempt in range(MAX_RETRIES):
+                try:
+                    response = client.chat.completions.create(
+                        model=model,
+                        messages=messages,
+                        tools=tools,
+                        tool_choice="auto",
+                        temperature=TEMPERATURE,
+                    )
+                    break
+                except Exception as e:
+                    last_error = str(e)
+                    status = getattr(e, "status_code", None)
+                    if status in RETRYABLE_STATUS_CODES and attempt < MAX_RETRIES - 1:
+                        time.sleep(RETRY_BACKOFF[attempt])
+                        continue
+                    break
+            if response is None:
                 step_num += 1
                 rewards.append(0.0)
                 log_step(step=step_num, action="api_error", reward=0.0, done=False, error=last_error)

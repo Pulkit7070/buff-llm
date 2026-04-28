@@ -16,19 +16,19 @@ tasks:
     description: "3 services, 1 fault, 15-tick budget. Single root cause."
     difficulty: easy
     seed: 42
-    max_steps: 40
+    max_steps: 15
 
   - name: sre-incident-medium
     description: "6 services, 1 fault + 2 red herrings, 20-tick budget."
     difficulty: medium
     seed: 137
-    max_steps: 40
+    max_steps: 20
 
   - name: sre-incident-hard
     description: "8 services, 2 faults + 2 red herrings, 25-tick budget."
     difficulty: hard
     seed: 256
-    max_steps: 40
+    max_steps: 25
 
 action_space:
   type: function_call

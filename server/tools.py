@@ -97,7 +97,7 @@ def restart_pod(world: World, *, service: str, **kw) -> dict:
             s.restart_cooldown = 0
             recompute_status(s)
 
-    svc.pending_effects.append((world.tick + 3, _finish))
+    svc.pending_effects.append((world.tick + 2, _finish))
     svc.log_buffer.append({
         "tick": world.tick, "level": "INFO",
         "msg": f"T+{world.tick:03d} svc={svc.name} event=pod_restart initiated",

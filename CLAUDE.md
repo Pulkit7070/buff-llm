@@ -30,7 +30,12 @@ docker build -t incidentroom .
 docker run -p 7860:7860 incidentroom
 ```
 
-No test suite exists. Verify changes by running `python demo.py --all` (rule-based agent across difficulties) or starting the webapp and exercising endpoints.
+```bash
+# Run tests
+python -m pytest tests/ -v
+```
+
+Verify changes by running `python demo.py --all` (rule-based agent across difficulties) or starting the webapp and exercising endpoints.
 
 ## Architecture
 

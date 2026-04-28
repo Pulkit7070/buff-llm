@@ -56,6 +56,29 @@ def parse_scenario(yaml_text: str) -> dict:
         raise ValueError("Scenario must be a YAML mapping")
     if "services" not in data or not data["services"]:
         raise ValueError("Scenario must define at least one service")
+
+    # Validate service names are unique
+    svc_names = {s["name"] for s in data["services"] if "name" in s}
+    if len(svc_names) != len(data["services"]):
+        raise ValueError("All services must have unique 'name' fields")
+
+    # Validate dependency references
+    for s_def in data["services"]:
+        for dep in s_def.get("dependencies", []):
+            if dep not in svc_names:
+                raise ValueError(
+                    f"Service '{s_def['name']}' references unknown dependency '{dep}'"
+                )
+
+    # Validate fault targets
+    for f_def in data.get("faults", []):
+        f_type = f_def.get("type", "")
+        f_target = f_def.get("target", "")
+        if f_type and f_type not in FAULT_MAP:
+            raise ValueError(f"Unknown fault type '{f_type}'. Valid: {list(FAULT_MAP.keys())}")
+        if f_target and f_target not in svc_names:
+            raise ValueError(f"Fault targets unknown service '{f_target}'")
+
     return data
 
 
