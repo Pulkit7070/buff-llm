@@ -215,6 +215,9 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 .field .hint{font:400 9px 'Inter',sans-serif;color:var(--t4);margin-top:2px}
 .modal-foot{padding:12px 18px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:6px}
 .modal-foot .btn{padding:7px 20px}
+.prov-btn{padding:4px 10px;border-radius:5px;border:1px solid var(--border);background:var(--surface);color:var(--t2);font:600 9px 'JetBrains Mono',monospace;cursor:pointer;text-transform:uppercase;letter-spacing:.5px;transition:all .15s}
+.prov-btn:hover{border-color:var(--border-h);color:var(--t1)}
+.prov-btn.active{border-color:var(--accent);color:var(--accent);background:var(--accent-dim)}
 .btn-save{background:var(--accent);color:#fff}
 .btn-cancel{background:var(--surface);color:var(--t2);border:1px solid var(--border)}
 .btn-danger{background:rgba(239,68,68,.15);color:var(--red);border:1px solid rgba(239,68,68,.2)}
@@ -408,9 +411,10 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   <div class="modal">
     <div class="modal-hdr"><h3>LLM Settings</h3><button class="modal-close" onclick="closeModal('settingsModal')" aria-label="Close">&times;</button></div>
     <div class="modal-body">
-      <div class="field"><label>API Base URL</label><input type="text" id="cfgBaseUrl" placeholder="https://api.openai.com/v1"><div class="hint">OpenAI-compatible endpoint</div></div>
-      <div class="field"><label>API Key</label><div class="field-row"><input type="password" id="cfgApiKey" placeholder="sk-..."><button class="btn-icon" id="btnEye" title="Toggle visibility">SHOW</button></div><div class="hint">Never sent to our server — goes directly to the API</div></div>
-      <div class="field"><label>Model</label><input type="text" id="cfgModel" list="modelList" placeholder="gpt-4.1-mini"><datalist id="modelList"><option value="gpt-4.1-mini"><option value="gpt-4.1"><option value="gpt-4o"><option value="gpt-4o-mini"><option value="gpt-3.5-turbo"><option value="o3-mini"><option value="o4-mini"><option value="claude-sonnet-4-6"><option value="claude-haiku-4-5"><option value="gemini-2.5-flash"><option value="gemini-2.5-pro"></datalist></div>
+      <div class="field"><label>Provider</label><div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:2px"><button class="prov-btn" data-url="https://generativelanguage.googleapis.com/v1beta/openai" data-model="gemini-2.5-flash" onclick="setProvider(this)">Google AI Studio</button><button class="prov-btn" data-url="https://api.openai.com/v1" data-model="gpt-4.1-mini" onclick="setProvider(this)">OpenAI</button><button class="prov-btn" data-url="https://router.huggingface.co/v1" data-model="meta-llama/Llama-3.1-8B-Instruct" onclick="setProvider(this)">HuggingFace</button><button class="prov-btn" onclick="setProvider(this)">Custom</button></div><div class="hint">Auto-fills URL and model</div></div>
+      <div class="field"><label>API Base URL</label><input type="text" id="cfgBaseUrl" placeholder="https://generativelanguage.googleapis.com/v1beta/openai"><div class="hint">OpenAI-compatible endpoint</div></div>
+      <div class="field"><label>API Key</label><div class="field-row"><input type="password" id="cfgApiKey" placeholder="AIza... (Google AI Studio key)"><button class="btn-icon" id="btnEye" title="Toggle visibility">SHOW</button></div><div class="hint">Never sent to our server — goes directly to the API</div></div>
+      <div class="field"><label>Model</label><input type="text" id="cfgModel" list="modelList" placeholder="gemini-2.5-flash"><datalist id="modelList"><option value="gemini-2.5-flash"><option value="gemini-2.5-pro"><option value="gemini-2.0-flash"><option value="gemini-2.0-flash-lite"><option value="gpt-4.1-mini"><option value="gpt-4.1"><option value="gpt-4o"><option value="gpt-4o-mini"><option value="o4-mini"><option value="claude-sonnet-4-6"><option value="claude-haiku-4-5"></datalist></div>
       <div class="field"><label>System Prompt</label><textarea id="cfgPrompt" rows="6"></textarea></div>
     </div>
     <div class="modal-foot"><button class="btn btn-cancel" onclick="closeModal('settingsModal')">CANCEL</button><button class="btn btn-save" onclick="saveSettings()">SAVE</button></div>
@@ -604,9 +608,10 @@ function sndWin(){beep(523,.1);setTimeout(()=>beep(659,.1),100);setTimeout(()=>b
 $('#btnMute').onclick=()=>{muted=!muted;$('#btnMute').textContent=muted?'\u{1f507}':'\u{1f50a}'};
 
 /* Settings */
-function loadSettings(){return{baseUrl:localStorage.getItem('ir_base_url')||'https://api.openai.com/v1',apiKey:localStorage.getItem('ir_api_key')||'',model:localStorage.getItem('ir_model')||'gpt-4.1-mini',systemPrompt:localStorage.getItem('ir_system_prompt')||DEFAULT_PROMPT}}
-function openSettings(){const s=loadSettings();$('#cfgBaseUrl').value=s.baseUrl;$('#cfgApiKey').value=s.apiKey;$('#cfgModel').value=s.model;$('#cfgPrompt').value=s.systemPrompt;openModal('settingsModal')}
-function saveSettings(){localStorage.setItem('ir_base_url',$('#cfgBaseUrl').value.trim()||'https://api.openai.com/v1');localStorage.setItem('ir_api_key',$('#cfgApiKey').value.trim());localStorage.setItem('ir_model',$('#cfgModel').value.trim()||'gpt-4.1-mini');localStorage.setItem('ir_system_prompt',$('#cfgPrompt').value.trim()||DEFAULT_PROMPT);closeModal('settingsModal')}
+function loadSettings(){return{baseUrl:localStorage.getItem('ir_base_url')||'https://generativelanguage.googleapis.com/v1beta/openai',apiKey:localStorage.getItem('ir_api_key')||'',model:localStorage.getItem('ir_model')||'gemini-2.5-flash',systemPrompt:localStorage.getItem('ir_system_prompt')||DEFAULT_PROMPT}}
+function openSettings(){const s=loadSettings();$('#cfgBaseUrl').value=s.baseUrl;$('#cfgApiKey').value=s.apiKey;$('#cfgModel').value=s.model;$('#cfgPrompt').value=s.systemPrompt;document.querySelectorAll('.prov-btn').forEach(b=>b.classList.toggle('active',!!b.dataset.url&&b.dataset.url===s.baseUrl));openModal('settingsModal')}
+function setProvider(btn){document.querySelectorAll('.prov-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');if(btn.dataset.url)$('#cfgBaseUrl').value=btn.dataset.url;if(btn.dataset.model)$('#cfgModel').value=btn.dataset.model}
+function saveSettings(){localStorage.setItem('ir_base_url',$('#cfgBaseUrl').value.trim()||'https://generativelanguage.googleapis.com/v1beta/openai');localStorage.setItem('ir_api_key',$('#cfgApiKey').value.trim());localStorage.setItem('ir_model',$('#cfgModel').value.trim()||'gemini-2.5-flash');localStorage.setItem('ir_system_prompt',$('#cfgPrompt').value.trim()||DEFAULT_PROMPT);closeModal('settingsModal')}
 $('#btnSettings').onclick=openSettings;
 $('#btnEye').onclick=()=>{const i=$('#cfgApiKey'),s=i.type==='password';i.type=s?'text':'password';$('#btnEye').textContent=s?'HIDE':'SHOW'};
 
